@@ -98,7 +98,22 @@ Drivers/BSP/STM32F4-Discovery/stm32f4_discovery_audio.c \
 Drivers/BSP/STM32F4-Discovery/stm32f4_discovery_accelerometer.c \
 Src/syscalls.c \
 Src/dbgu.c \
-Src/term_io.c
+Src/term_io.c \
+helix/mp3dec.c \
+helix/mp3tabs.c \
+helix/real/bitstream.c \
+helix/real/buffers.c \
+helix/real/dct32.c \
+helix/real/dequant.c \
+helix/real/dqchan.c \
+helix/real/huffman.c \
+helix/real/hufftabs.c \
+helix/real/imdct.c \
+helix/real/polyphase.c \
+helix/real/scalfact.c \
+helix/real/stproc.c \
+helix/real/subband.c \
+helix/real/trigtabs_fixpt.c
 
 
 # ASM sources
@@ -125,6 +140,7 @@ SZ = $(PREFIX)size
 endif
 HEX = $(CP) -O ihex
 BIN = $(CP) -O binary -S
+AR=arm-none-eabi-ar
  
 #######################################
 # CFLAGS
@@ -137,6 +153,14 @@ FPU = -mfpu=fpv4-sp-d16
 
 # float-abi
 FLOAT-ABI = -mfloat-abi=hard
+
+# Check for valid float argument
+ifneq ($(FLOAT_TYPE), hard)
+ifneq ($(FLOAT_TYPE), soft)
+override FLOAT_TYPE = hard
+#override FLOAT_TYPE = soft
+endif
+endif
 
 # mcu
 MCU = $(CPU) -mthumb $(FPU) $(FLOAT-ABI)
@@ -170,7 +194,9 @@ C_INCLUDES =  \
 -IMiddlewares/Third_Party/FatFs/src \
 -IMiddlewares/Third_Party/FreeRTOS/Source/include \
 -IMiddlewares/Third_Party/FreeRTOS/Source/CMSIS_RTOS \
--IDrivers/CMSIS/Include
+-IDrivers/CMSIS/Include \
+-Ihelix \
+-Ihelix/pub
 
 
 # compile gcc flags
@@ -186,7 +212,16 @@ endif
 # Generate dependency information
 CFLAGS += -MMD -MP -MF"$(@:%.o=%.d)"
 
-
+#to dodałyśmy
+ifeq ($(FLOAT_TYPE), hard)
+CFLAGS += -fsingle-precision-constant -Wdouble-promotion
+CFLAGS += -mfpu=fpv4-sp-d16 -mfloat-abi=hard
+#CFLAGS += -mfpu=fpv4-sp-d16 -mfloat-abi=softfp
+else
+CFLAGS += -msoft-float
+endif
+CFLAGS += -ffreestanding -nostdlib
+CFLAGS += -Ireal -Ipub
 #######################################
 # LDFLAGS
 #######################################
@@ -249,4 +284,4 @@ program:
 #######################################
 -include $(wildcard $(BUILD_DIR)/*.d)
 
-# *** EOF ***
+# * EOF *

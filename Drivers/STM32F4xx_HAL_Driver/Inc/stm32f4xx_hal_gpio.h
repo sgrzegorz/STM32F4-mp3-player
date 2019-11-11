@@ -295,6 +295,8 @@ void HAL_GPIO_EXTI_Callback(uint16_t GPIO_Pin);
                               ((SPEED) == GPIO_SPEED_FREQ_HIGH) || ((SPEED) == GPIO_SPEED_FREQ_VERY_HIGH))
 #define IS_GPIO_PULL(PULL) (((PULL) == GPIO_NOPULL) || ((PULL) == GPIO_PULLUP) || \
                             ((PULL) == GPIO_PULLDOWN))
+
+                         
 /**
   * @}
   */

@@ -47,18 +47,54 @@
   ******************************************************************************
   */
 /* Includes ------------------------------------------------------------------*/
+#define BUTTON			(GPIOA->IDR & GPIO_Pin_0)
+
+
+#define AUDIO_BUFFER_SIZE             4096
+#define FILE_READ_BUFFER_SIZE			8192
+
 #include "main.h"
 #include "stm32f4xx_hal.h"
 #include "cmsis_os.h"
 #include "fatfs.h"
+
+#define IS_GPIO_ALL_PERIPH(PERIPH) (((PERIPH) == GPIOA) || \
+                                ((PERIPH) == GPIOB) || \
+                                ((PERIPH) == GPIOC) || \
+                                ((PERIPH) == GPIOD) || \
+                                ((PERIPH) == GPIOE) || \
+                                ((PERIPH) == GPIOF) || \
+                                ((PERIPH) == GPIOG) || \
+                                ((PERIPH) == GPIOH) || \
+                                ((PERIPH) == GPIOI))
+                                FIL file;
+
 #include "usb_host.h"
+#include "mp3dec.h"
 
 /* USER CODE BEGIN Includes */
-
 #include "stm32f4_discovery_audio.h"
 #include "ansi.h"
 #include "term_io.h"
 #include "dbgu.h"
+
+const char* FNAME = "haltmich.wav";
+extern ApplicationTypeDef Appli_state;
+extern USBH_HandleTypeDef hUsbHostHS;
+enum
+{
+  BUFFER_OFFSET_NONE = 0,  
+  BUFFER_OFFSET_HALF,  
+  BUFFER_OFFSET_FULL,     
+};
+char					file_read_buffer[FILE_READ_BUFFER_SIZE];
+MP3FrameInfo			mp3FrameInfo;
+HMP3Decoder				hMP3Decoder;
+uint8_t buff[AUDIO_BUFFER_SIZE];
+static uint8_t player_state = 0;
+static uint8_t buf_offs = BUFFER_OFFSET_NONE;
+static uint32_t fpos = 0;
+
 
 /* USER CODE END Includes */
 
@@ -91,7 +127,14 @@ static void MX_SPI1_Init(void);
 static void MX_RNG_Init(void);
 static void MX_TIM6_Init(void);
 static void MX_USART2_UART_Init(void);
+void GPIO_SetBits(GPIO_TypeDef* GPIOx, uint16_t GPIO_Pin);
+void GPIO_ResetBits(GPIO_TypeDef* GPIOx, uint16_t GPIO_Pin);
+static void playMP3();
+
+ 
+static void AudioCallback(void *context, int buffer) ;
 void StartDefaultTask(void const * argument);
+
 
 /* USER CODE BEGIN PFP */
 /* Private function prototypes -----------------------------------------------*/
@@ -471,22 +514,7 @@ static void MX_GPIO_Init(void)
 }
 
 /* USER CODE BEGIN 4 */
-FIL file;
 
-const char* FNAME = "haltmich.wav";
-extern ApplicationTypeDef Appli_state;
-extern USBH_HandleTypeDef hUsbHostHS;
-enum
-{
-  BUFFER_OFFSET_NONE = 0,  
-  BUFFER_OFFSET_HALF,  
-  BUFFER_OFFSET_FULL,     
-};
-#define AUDIO_BUFFER_SIZE             4096
-uint8_t buff[AUDIO_BUFFER_SIZE];
-static uint8_t player_state = 0;
-static uint8_t buf_offs = BUFFER_OFFSET_NONE;
-static uint32_t fpos = 0;
 
 
 static void f_disp_res(FRESULT r)
@@ -539,7 +567,164 @@ void BSP_AUDIO_OUT_TransferComplete_CallBack(void)
   BSP_AUDIO_OUT_ChangeBuffer((uint16_t*)&buff[0], AUDIO_BUFFER_SIZE / 2);
 }
 
+// //funkcja przeklejona z biblioteki
+// void GPIO_SetBits(GPIO_TypeDef* GPIOx, uint16_t GPIO_Pin)
+// {
+//   /* Check the parameters */
+//   assert_param(IS_GPIO_ALL_PERIPH(GPIOx));
+//   assert_param(IS_GPIO_PIN(GPIO_Pin));
 
+//   GPIOx->BSRRL = GPIO_Pin;
+// }
+
+// void GPIO_ResetBits(GPIO_TypeDef* GPIOx, uint16_t GPIO_Pin)
+// {
+//   /* Check the parameters */
+//   assert_param(IS_GPIO_ALL_PERIPH(GPIOx));
+//   assert_param(IS_GPIO_PIN(GPIO_Pin));
+
+//   GPIOx->BSRRH = GPIO_Pin;
+// }
+
+static void AudioCallback(void *context, int buffer) {
+	static int16_t audio_buffer0[4096];
+	static int16_t audio_buffer1[4096];
+
+	int offset, err;
+	int outOfData = 0;
+
+	int16_t *samples;
+	if (buffer) {
+		samples = audio_buffer0;
+	//	GPIO_SetBits(GPIOD, GPIO_Pin_13);
+	//	GPIO_ResetBits(GPIOD, GPIO_Pin_14);
+	} else {
+		samples = audio_buffer1;
+	//	GPIO_SetBits(GPIOD, GPIO_Pin_14);
+	//	GPIO_ResetBits(GPIOD, GPIO_Pin_13);
+	}
+
+	offset = MP3FindSyncWord((unsigned char*)read_ptr, bytes_left);
+	bytes_left -= offset;
+	read_ptr += offset;
+
+	err = MP3Decode(hMP3Decoder, (unsigned char**)&read_ptr, (int*)&bytes_left, samples, 0);
+
+	if (err) {
+		/* error occurred */
+		switch (err) {
+		case ERR_MP3_INDATA_UNDERFLOW:
+			outOfData = 1;
+			break;
+		case ERR_MP3_MAINDATA_UNDERFLOW:
+			/* do nothing - next call to decode will provide more mainData */
+			break;
+		case ERR_MP3_FREE_BITRATE_SYNC:
+		default:
+			outOfData = 1;
+			break;
+		}
+	} else {
+		// no error
+		MP3GetLastFrameInfo(hMP3Decoder, &mp3FrameInfo);
+
+		// Duplicate data in case of mono to maintain playback speed
+		if (mp3FrameInfo.nChans == 1) {
+			for(int i = mp3FrameInfo.outputSamps;i >= 0;i--) 	{
+				samples[2 * i]=samples[i];
+				samples[2 * i + 1]=samples[i];
+			}
+			mp3FrameInfo.outputSamps *= 2;
+		}
+	}
+
+	if (!outOfData) {
+		ProvideAudioBuffer(samples, mp3FrameInfo.outputSamps);
+	}
+}
+
+
+
+
+
+static void playMP3(){
+  char* filename = "0:/sound.mp3";
+  unsigned int br, btr;
+	FRESULT res;
+
+	bytes_left = FILE_READ_BUFFER_SIZE;
+	read_ptr = file_read_buffer;
+
+	if (FR_OK == f_open(&file, filename, FA_OPEN_EXISTING | FA_READ)) {
+
+		//Read ID3v2 Tag
+		/*
+		char szArtist[120];
+		char szTitle[120];
+		Mp3ReadId3V2Tag(&file, szArtist, sizeof(szArtist), szTitle, sizeof(szTitle));
+		*/
+
+		Fill buffer
+		f_read(&file, file_read_buffer, FILE_READ_BUFFER_SIZE, &br);
+
+		// Play mp3
+		hMP3Decoder = MP3InitDecoder();
+
+     if(BSP_AUDIO_OUT_Init(OUTPUT_DEVICE_AUTO,70,44100) == 0)
+  {
+	  xprintf("audio init OK\n");
+  }
+
+
+		//InitializeAudio(Audio44100HzSettings);
+		//SetAudioVolume(0xAF);
+		PlayAudioWithCallback(AudioCallback, 0);
+
+		for(;;) {
+			/*
+			 * If past half of buffer, refill...
+			 *
+			 * When bytes_left changes, the audio callback has just been executed. This
+			 * means that there should be enough time to copy the end of the buffer
+			 * to the beginning and update the pointer before the next audio callback.
+			 * Getting audio callbacks while the next part of the file is read from the
+			 * file system should not cause problems.
+			 */
+			if (bytes_left < (FILE_READ_BUFFER_SIZE / 2)) {
+				// Copy rest of data to beginning of read buffer
+				memcpy(file_read_buffer, read_ptr, bytes_left);
+
+				// Update read pointer for audio sampling
+				read_ptr = file_read_buffer;
+
+				// Read next part of file
+				btr = FILE_READ_BUFFER_SIZE - bytes_left;
+				res = f_read(&file, file_read_buffer + bytes_left, btr, &br);
+
+				// Update the bytes left variable
+				bytes_left = FILE_READ_BUFFER_SIZE;
+
+				// Out of data or error or user button... Stop playback!
+				if (br < btr || res != FR_OK || BUTTON) {
+					StopAudio();
+
+					// Re-initialize and set volume to avoid noise
+					InitializeAudio(Audio44100HzSettings);
+					SetAudioVolume(0);
+
+					// Close currently open file
+					f_close(&file);
+
+					// Wait for user button release
+					while(BUTTON){};
+
+					// Return to previous function
+					return;
+				}
+			}
+		}
+	}
+}
 
 
 /* USER CODE END 4 */
@@ -573,7 +758,9 @@ void StartDefaultTask(void const * argument)
 	  vTaskDelay(250);
   }while(Appli_state != APPLICATION_READY);
   
+  playMP3();
   
+  /*
   FRESULT res;
   
   res = f_open(&file,"0:/test_1k.wav",FA_READ);
@@ -597,9 +784,10 @@ void StartDefaultTask(void const * argument)
   {
 	  xprintf("audio init ERROR\n");
   }
-  
+  /*
   
   /* Infinite loop */
+  /*
   for(;;)
   {
 	  
@@ -612,6 +800,7 @@ void StartDefaultTask(void const * argument)
 			xprintf("play command...\n");
 			if(player_state) {xprintf("already playing\n"); break;}
 			player_state = 1;
+			playMP3();
 			BSP_AUDIO_OUT_Play((uint16_t*)&buff[0],AUDIO_BUFFER_SIZE);
 			fpos = 0;
 			buf_offs = BUFFER_OFFSET_NONE;
@@ -664,6 +853,7 @@ void StartDefaultTask(void const * argument)
 	vTaskDelay(2);
 	  
   }
+  */
   /* USER CODE END 5 */ 
 }
 
@@ -719,6 +909,21 @@ void assert_failed(uint8_t* file, uint32_t line)
      tex: printf("Wrong parameters value: file %s on line %d\r\n", file, line) */
   /* USER CODE END 6 */
 }
+
+//OUR FUNCTIONS
+
+
+
+
+
+
+
+
+
+
+
+
+
 #endif /* USE_FULL_ASSERT */
 
 /**

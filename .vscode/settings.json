@@ -1,0 +1,6 @@
+{
+    "files.associations": {
+        "mp3dec.h": "c",
+        "platform.h": "c"
+    }
+}
