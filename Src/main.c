@@ -47,7 +47,7 @@
   ******************************************************************************
   */
 /* Includes ------------------------------------------------------------------*/
-#define READ_BUFFER_SIZE	2 * MAINBUF_SIZE +216
+#define READ_BUFFER_SIZE	2 * MAINBUF_SIZE + 216
 #define DECODED_MP3_FRAME_SIZE	MAX_NGRAN * MAX_NCHAN * MAX_NSAMP
 #define OUT_BUFFER_SIZE			2 * DECODED_MP3_FRAME_SIZE
 #define END_OF_FILE	-1
@@ -556,7 +556,7 @@ void BSP_AUDIO_OUT_HalfTransfer_CallBack(void)
 void BSP_AUDIO_OUT_TransferComplete_CallBack(void)
 {
   buf_offs = BUFFER_OFFSET_FULL;
-  BSP_AUDIO_OUT_ChangeBuffer((uint16_t*)&buff[0], OUT_BUFFER_SIZE / 2);
+  BSP_AUDIO_OUT_ChangeBuffer((uint16_t*)&out_buffer[0], OUT_BUFFER_SIZE / 2);
 }
 
 
@@ -785,7 +785,7 @@ int mp3_proccess(FIL *mp3_file){
 		buf_offs = BUFFER_OFFSET_NONE;
 	}
 	if(buf_offs == (BUFFER_OFFSET_FULL)){
-		result = MP3Decode(hMP3Decoder, &read_pointer, &bytes_left, &out_buffer[DECODED_MP3_FRAME_SIZE], 0);
+		result = MP3Decode(hMP3Decoder, &read_pointer, &bytes_left, &out_buffer[2048], 0);
 		buf_offs = BUFFER_OFFSET_NONE;
 	}
 
