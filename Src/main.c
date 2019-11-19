@@ -47,11 +47,20 @@
   ******************************************************************************
   */
 /* Includes ------------------------------------------------------------------*/
+#define READ_BUFFER_SIZE	2 * MAINBUF_SIZE +216
+#define DECODED_MP3_FRAME_SIZE	MAX_NGRAN * MAX_NCHAN * MAX_NSAMP
+#define OUT_BUFFER_SIZE			2 * DECODED_MP3_FRAME_SIZE
+#define END_OF_FILE	-1
+#define READ_ERROR	-2
 #include "main.h"
 #include "stm32f4xx_hal.h"
 #include "cmsis_os.h"
 #include "fatfs.h"
 #include "usb_host.h"
+#include "mp3dec.h"
+
+
+
 
 /* USER CODE BEGIN Includes */
 
@@ -60,6 +69,15 @@
 #include "term_io.h"
 #include "dbgu.h"
 
+static HMP3Decoder hMP3Decoder;
+static unsigned char *read_pointer;
+static unsigned char read_buffer[READ_BUFFER_SIZE];
+static int offset;
+static int result;
+short out_buffer[OUT_BUFFER_SIZE];
+static int underflows=0;
+static int bytes_left=0;
+static int bytes_left_before_decoding=0;
 /* USER CODE END Includes */
 
 /* Private variables ---------------------------------------------------------*/
@@ -91,6 +109,8 @@ static void MX_SPI1_Init(void);
 static void MX_RNG_Init(void);
 static void MX_TIM6_Init(void);
 static void MX_USART2_UART_Init(void);
+int refill_inbuffer(FIL *in_file);
+int mp3_proccess(FIL *mp3_file);
 void StartDefaultTask(void const * argument);
 
 /* USER CODE BEGIN PFP */
@@ -536,7 +556,7 @@ void BSP_AUDIO_OUT_HalfTransfer_CallBack(void)
 void BSP_AUDIO_OUT_TransferComplete_CallBack(void)
 {
   buf_offs = BUFFER_OFFSET_FULL;
-  BSP_AUDIO_OUT_ChangeBuffer((uint16_t*)&buff[0], AUDIO_BUFFER_SIZE / 2);
+  BSP_AUDIO_OUT_ChangeBuffer((uint16_t*)&buff[0], OUT_BUFFER_SIZE / 2);
 }
 
 
@@ -576,7 +596,7 @@ void StartDefaultTask(void const * argument)
   
   FRESULT res;
   
-  res = f_open(&file,"0:/test_1k.wav",FA_READ);
+  res = f_open(&file,"0:/sound.mp3",FA_READ);
   
   if(res==FR_OK)
   {
@@ -598,8 +618,11 @@ void StartDefaultTask(void const * argument)
 	  xprintf("audio init ERROR\n");
   }
   
+  hMP3Decoder = MP3InitDecoder();
+	read_pointer = NULL;
   
   /* Infinite loop */
+  
   for(;;)
   {
 	  
@@ -612,7 +635,7 @@ void StartDefaultTask(void const * argument)
 			xprintf("play command...\n");
 			if(player_state) {xprintf("already playing\n"); break;}
 			player_state = 1;
-			BSP_AUDIO_OUT_Play((uint16_t*)&buff[0],AUDIO_BUFFER_SIZE);
+			BSP_AUDIO_OUT_Play((uint16_t*)&out_buffer[0],OUT_BUFFER_SIZE);
 			fpos = 0;
 			buf_offs = BUFFER_OFFSET_NONE;
 			break;
@@ -622,12 +645,15 @@ void StartDefaultTask(void const * argument)
 	if(player_state)
 	{
 		uint32_t br;
-		
-		if(buf_offs == BUFFER_OFFSET_HALF)
+		 mp3_proccess(&file);
+		/*
+    if(buf_offs == BUFFER_OFFSET_HALF)
 		{
+
+    
 		  if(f_read(&file, 
 					&buff[0], 
-					AUDIO_BUFFER_SIZE/2,
+					OUT_BUFFER_SIZE/2,
 					(void *)&br) != FR_OK)
 		  { 
 			BSP_AUDIO_OUT_Stop(CODEC_PDWN_SW); 
@@ -635,14 +661,15 @@ void StartDefaultTask(void const * argument)
 		  }
 		  buf_offs = BUFFER_OFFSET_NONE;
 		  fpos += br;
+    
 		  
 		}
 		
 		if(buf_offs == BUFFER_OFFSET_FULL)
 		{
 			if(f_read(&file, 
-					&buff[AUDIO_BUFFER_SIZE /2], 
-					AUDIO_BUFFER_SIZE/2, 
+					&buff[OUT_BUFFER_SIZE /2], 
+					OUT_BUFFER_SIZE/2, 
 					(void *)&br) != FR_OK)
 			{ 
 				BSP_AUDIO_OUT_Stop(CODEC_PDWN_SW); 
@@ -653,18 +680,20 @@ void StartDefaultTask(void const * argument)
 			fpos += br; 
 		}
 
-		if( br < AUDIO_BUFFER_SIZE/2 )
+		if( br < OUT_BUFFER_SIZE/2 )
 		{
 			xprintf("stop at eof\n");
 			BSP_AUDIO_OUT_Stop(CODEC_PDWN_SW); 
 			player_state = 0;
 		}
 	}  //if(player_state)
-	  
+	  */
 	vTaskDelay(2);
 	  
   }
+  
   /* USER CODE END 5 */ 
+}
 }
 
 /**
@@ -702,6 +731,117 @@ void _Error_Handler(char *file, int line)
   {
   }
   /* USER CODE END Error_Handler_Debug */
+}
+
+int mp3_proccess(FIL *mp3_file){
+  	MP3FrameInfo mp3FrameInfo;
+
+	if (read_pointer == NULL) {
+		if(refill_inbuffer(mp3_file) != 0){
+			return END_OF_FILE;
+		}
+	}
+
+	offset = MP3FindSyncWord(read_pointer, bytes_left);
+	while(offset < 0) {
+		if(refill_inbuffer(mp3_file) != 0)
+			return END_OF_FILE;
+		if(bytes_left > 0){
+			bytes_left -= 1;
+			read_pointer += 1;
+		}
+		offset = MP3FindSyncWord(read_pointer, bytes_left);
+	}
+	read_pointer += offset;
+	bytes_left -= offset;
+	bytes_left_before_decoding = bytes_left;
+
+	if (MP3GetNextFrameInfo(hMP3Decoder, &mp3FrameInfo, read_pointer) == 0 &&
+			mp3FrameInfo.nChans == 2 &&
+			mp3FrameInfo.version == 0) {
+		//debug_printf("Found a frame at offset %x\n", offset + read_ptr - mp3buf + mp3file->fptr);
+	} else {
+		// advance data pointer
+		// TODO: handle bytes_left == 0
+		if(bytes_left > 0){
+			bytes_left -= 1;
+			read_pointer += 1;
+		}
+		return 0;
+	}
+
+	if (bytes_left < MAINBUF_SIZE) {
+		if(refill_inbuffer(mp3_file) != 0)
+			return END_OF_FILE;
+	}
+
+	if(buf_offs == (BUFFER_OFFSET_HALF | BUFFER_OFFSET_FULL)){
+			underflows++;
+			//DAC_DMA_disable();
+	}
+
+	if(buf_offs == (BUFFER_OFFSET_HALF)){
+		result = MP3Decode(hMP3Decoder, &read_pointer, &bytes_left, out_buffer, 0);
+		buf_offs = BUFFER_OFFSET_NONE;
+	}
+	if(buf_offs == (BUFFER_OFFSET_FULL)){
+		result = MP3Decode(hMP3Decoder, &read_pointer, &bytes_left, &out_buffer[DECODED_MP3_FRAME_SIZE], 0);
+		buf_offs = BUFFER_OFFSET_NONE;
+	}
+
+	//DAC_DMA_enable();
+	if(result != ERR_MP3_NONE){
+		switch(result){
+		case ERR_MP3_INDATA_UNDERFLOW:
+			bytes_left = 0;
+			if(refill_inbuffer(mp3_file) != 0)
+				return END_OF_FILE;
+			break;
+		case ERR_MP3_MAINDATA_UNDERFLOW:
+			//do nothing, next call to MP3Decode will provide more data
+			break;
+		default:
+			return 0; //skip this frame if error
+			//return END_OF_FILE; //skip this file if error
+		}
+	}
+	return 0;
+
+
+
+
+}
+
+
+
+int refill_inbuffer(FIL *in_file)
+{
+	unsigned int bytes_read;
+	unsigned int bytes_to_read;
+	FRESULT result;
+
+	if (bytes_left > 0) {
+		//copy remaining data to beginning of buffer
+		memcpy(read_buffer, read_pointer, bytes_left);
+	}
+
+	bytes_to_read = READ_BUFFER_SIZE - bytes_left;
+
+	result = f_read(in_file, (BYTE *)read_buffer + bytes_left, bytes_to_read, &bytes_read);
+	if(result != FR_OK)
+		return READ_ERROR;
+
+	if (bytes_read == bytes_to_read){
+		read_pointer = read_buffer;
+		offset = 0;
+		bytes_left = READ_BUFFER_SIZE;
+		return 0;
+	}
+	else{
+		return END_OF_FILE;
+	}
+
+	return 0;  //should never reach this point
 }
 
 #ifdef  USE_FULL_ASSERT

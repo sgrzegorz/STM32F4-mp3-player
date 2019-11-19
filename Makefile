@@ -117,7 +117,10 @@ helix/real/trigtabs.c
 
 # ASM sources
 ASM_SOURCES =  \
-startup_stm32f407xx.s
+startup_stm32f407xx.s \
+helix/real/arm/asmmisc.s \
+helix/real/arm/asmpoly_thumb2.s
+
 
 
 #######################################
