@@ -47,20 +47,19 @@
   ******************************************************************************
   */
 /* Includes ------------------------------------------------------------------*/
-#define READ_BUFFER_SIZE	2 * MAINBUF_SIZE + 216
-#define DECODED_MP3_FRAME_SIZE	MAX_NGRAN * MAX_NCHAN * MAX_NSAMP
-#define OUT_BUFFER_SIZE			2 * DECODED_MP3_FRAME_SIZE
-#define END_OF_FILE	-1
-#define READ_ERROR	-2
+#define READ_BUFFER_SIZE (2 * MAINBUF_SIZE + 216) //4096
+#define DECODED_MP3_FRAME_SIZE MAX_NGRAN *MAX_NCHAN *MAX_NSAMP
+//#define OUT_BUFFER_SIZE			2 * DECODED_MP3_FRAME_SIZE//
+#define OUT_BUFFER_SIZE READ_BUFFER_SIZE * 2
+
+#define END_OF_FILE -1
+#define READ_ERROR -2
 #include "main.h"
 #include "stm32f4xx_hal.h"
 #include "cmsis_os.h"
 #include "fatfs.h"
 #include "usb_host.h"
 #include "mp3dec.h"
-
-
-
 
 /* USER CODE BEGIN Includes */
 
@@ -69,15 +68,15 @@
 #include "term_io.h"
 #include "dbgu.h"
 
-static HMP3Decoder hMP3Decoder;
+HMP3Decoder hMP3Decoder;
 static unsigned char *read_pointer;
 static unsigned char read_buffer[READ_BUFFER_SIZE];
 static int offset;
 static int result;
 short out_buffer[OUT_BUFFER_SIZE];
-static int underflows=0;
-static int bytes_left=0;
-static int bytes_left_before_decoding=0;
+static int underflows = 0;
+static int bytes_left = 0;
+static int bytes_left_before_decoding = 0;
 /* USER CODE END Includes */
 
 /* Private variables ---------------------------------------------------------*/
@@ -111,7 +110,7 @@ static void MX_TIM6_Init(void);
 static void MX_USART2_UART_Init(void);
 int refill_inbuffer(FIL *in_file);
 int mp3_proccess(FIL *mp3_file);
-void StartDefaultTask(void const * argument);
+void StartDefaultTask(void const *argument);
 
 /* USER CODE BEGIN PFP */
 /* Private function prototypes -----------------------------------------------*/
@@ -158,9 +157,9 @@ int main(void)
   MX_TIM6_Init();
   MX_USART2_UART_Init();
   /* USER CODE BEGIN 2 */
-debug_init(&huart2);
-xprintf("F4 player test!\n");
-xprintf("printf test!\n");
+  debug_init(&huart2);
+  xprintf("F4 player test!\n");
+  xprintf("printf test!\n");
   /* USER CODE END 2 */
 
   /* USER CODE BEGIN RTOS_MUTEX */
@@ -187,11 +186,10 @@ xprintf("printf test!\n");
   /* USER CODE BEGIN RTOS_QUEUES */
   /* add queues, ... */
   /* USER CODE END RTOS_QUEUES */
- 
 
   /* Start scheduler */
   osKernelStart();
-  
+
   /* We should never get here as control is now taken by the scheduler */
 
   /* Infinite loop */
@@ -199,13 +197,11 @@ xprintf("printf test!\n");
   while (1)
   {
 
-  /* USER CODE END WHILE */
+    /* USER CODE END WHILE */
 
-  /* USER CODE BEGIN 3 */
-
+    /* USER CODE BEGIN 3 */
   }
   /* USER CODE END 3 */
-
 }
 
 /**
@@ -219,13 +215,13 @@ void SystemClock_Config(void)
   RCC_ClkInitTypeDef RCC_ClkInitStruct;
   RCC_PeriphCLKInitTypeDef PeriphClkInitStruct;
 
-    /**Configure the main internal regulator output voltage 
+  /**Configure the main internal regulator output voltage 
     */
   __HAL_RCC_PWR_CLK_ENABLE();
 
   __HAL_PWR_VOLTAGESCALING_CONFIG(PWR_REGULATOR_VOLTAGE_SCALE1);
 
-    /**Initializes the CPU, AHB and APB busses clocks 
+  /**Initializes the CPU, AHB and APB busses clocks 
     */
   RCC_OscInitStruct.OscillatorType = RCC_OSCILLATORTYPE_HSE;
   RCC_OscInitStruct.HSEState = RCC_HSE_ON;
@@ -240,10 +236,9 @@ void SystemClock_Config(void)
     _Error_Handler(__FILE__, __LINE__);
   }
 
-    /**Initializes the CPU, AHB and APB busses clocks 
+  /**Initializes the CPU, AHB and APB busses clocks 
     */
-  RCC_ClkInitStruct.ClockType = RCC_CLOCKTYPE_HCLK|RCC_CLOCKTYPE_SYSCLK
-                              |RCC_CLOCKTYPE_PCLK1|RCC_CLOCKTYPE_PCLK2;
+  RCC_ClkInitStruct.ClockType = RCC_CLOCKTYPE_HCLK | RCC_CLOCKTYPE_SYSCLK | RCC_CLOCKTYPE_PCLK1 | RCC_CLOCKTYPE_PCLK2;
   RCC_ClkInitStruct.SYSCLKSource = RCC_SYSCLKSOURCE_PLLCLK;
   RCC_ClkInitStruct.AHBCLKDivider = RCC_SYSCLK_DIV1;
   RCC_ClkInitStruct.APB1CLKDivider = RCC_HCLK_DIV4;
@@ -262,11 +257,11 @@ void SystemClock_Config(void)
     _Error_Handler(__FILE__, __LINE__);
   }
 
-    /**Configure the Systick interrupt time 
+  /**Configure the Systick interrupt time 
     */
-  HAL_SYSTICK_Config(HAL_RCC_GetHCLKFreq()/1000);
+  HAL_SYSTICK_Config(HAL_RCC_GetHCLKFreq() / 1000);
 
-    /**Configure the Systick 
+  /**Configure the Systick 
     */
   HAL_SYSTICK_CLKSourceConfig(SYSTICK_CLKSOURCE_HCLK);
 
@@ -291,7 +286,6 @@ static void MX_I2C1_Init(void)
   {
     _Error_Handler(__FILE__, __LINE__);
   }
-
 }
 
 /* I2S3 init function */
@@ -303,6 +297,7 @@ static void MX_I2S3_Init(void)
   hi2s3.Init.Standard = I2S_STANDARD_PHILIPS;
   hi2s3.Init.DataFormat = I2S_DATAFORMAT_16B;
   hi2s3.Init.MCLKOutput = I2S_MCLKOUTPUT_ENABLE;
+  //
   hi2s3.Init.AudioFreq = I2S_AUDIOFREQ_96K;
   hi2s3.Init.CPOL = I2S_CPOL_LOW;
   hi2s3.Init.ClockSource = I2S_CLOCK_PLL;
@@ -311,7 +306,6 @@ static void MX_I2S3_Init(void)
   {
     _Error_Handler(__FILE__, __LINE__);
   }
-
 }
 
 /* RNG init function */
@@ -323,7 +317,6 @@ static void MX_RNG_Init(void)
   {
     _Error_Handler(__FILE__, __LINE__);
   }
-
 }
 
 /* SPI1 init function */
@@ -347,7 +340,6 @@ static void MX_SPI1_Init(void)
   {
     _Error_Handler(__FILE__, __LINE__);
   }
-
 }
 
 /* TIM6 init function */
@@ -371,7 +363,6 @@ static void MX_TIM6_Init(void)
   {
     _Error_Handler(__FILE__, __LINE__);
   }
-
 }
 
 /* USART2 init function */
@@ -390,7 +381,6 @@ static void MX_USART2_UART_Init(void)
   {
     _Error_Handler(__FILE__, __LINE__);
   }
-
 }
 
 /** Configure pins as 
@@ -422,8 +412,7 @@ static void MX_GPIO_Init(void)
   HAL_GPIO_WritePin(OTG_FS_PowerSwitchOn_GPIO_Port, OTG_FS_PowerSwitchOn_Pin, GPIO_PIN_SET);
 
   /*Configure GPIO pin Output Level */
-  HAL_GPIO_WritePin(GPIOD, LD4_Pin|LD3_Pin|LD5_Pin|LD6_Pin 
-                          |Audio_RST_Pin, GPIO_PIN_RESET);
+  HAL_GPIO_WritePin(GPIOD, LD4_Pin | LD3_Pin | LD5_Pin | LD6_Pin | Audio_RST_Pin, GPIO_PIN_RESET);
 
   /*Configure GPIO pin : CS_I2C_SPI_Pin */
   GPIO_InitStruct.Pin = CS_I2C_SPI_Pin;
@@ -469,8 +458,7 @@ static void MX_GPIO_Init(void)
 
   /*Configure GPIO pins : LD4_Pin LD3_Pin LD5_Pin LD6_Pin 
                            Audio_RST_Pin */
-  GPIO_InitStruct.Pin = LD4_Pin|LD3_Pin|LD5_Pin|LD6_Pin 
-                          |Audio_RST_Pin;
+  GPIO_InitStruct.Pin = LD4_Pin | LD3_Pin | LD5_Pin | LD6_Pin | Audio_RST_Pin;
   GPIO_InitStruct.Mode = GPIO_MODE_OUTPUT_PP;
   GPIO_InitStruct.Pull = GPIO_NOPULL;
   GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_LOW;
@@ -487,56 +475,94 @@ static void MX_GPIO_Init(void)
   GPIO_InitStruct.Mode = GPIO_MODE_EVT_RISING;
   GPIO_InitStruct.Pull = GPIO_NOPULL;
   HAL_GPIO_Init(MEMS_INT2_GPIO_Port, &GPIO_InitStruct);
-
 }
 
 /* USER CODE BEGIN 4 */
 FIL file;
 
-const char* FNAME = "haltmich.wav";
+const char *FNAME = "haltmich.wav";
 extern ApplicationTypeDef Appli_state;
 extern USBH_HandleTypeDef hUsbHostHS;
 enum
 {
-  BUFFER_OFFSET_NONE = 0,  
-  BUFFER_OFFSET_HALF,  
-  BUFFER_OFFSET_FULL,     
+  BUFFER_OFFSET_NONE = 0,
+  BUFFER_OFFSET_HALF,
+  BUFFER_OFFSET_FULL,
 };
-#define AUDIO_BUFFER_SIZE             4096
+#define AUDIO_BUFFER_SIZE 4096
 uint8_t buff[AUDIO_BUFFER_SIZE];
 static uint8_t player_state = 0;
 static uint8_t buf_offs = BUFFER_OFFSET_NONE;
 static uint32_t fpos = 0;
 
-
 static void f_disp_res(FRESULT r)
 {
-	switch(r)
-	{
-		case FR_OK: printf("FR_OK\n"); break;
-		case FR_DISK_ERR: printf("FR_DISK_ERR\n"); break;
-		case FR_INT_ERR: printf("FR_INT_ERR\n"); break;
-		case FR_NOT_READY: printf("FR_NOT_READY\n"); break;
-		case FR_NO_FILE: printf("FR_NO_FILE\n"); break;
-		case FR_NO_PATH: printf("FR_NO_PATH\n"); break;
-		case FR_INVALID_NAME: printf("FR_INVALID_NAME\n"); break;
-		case FR_DENIED: printf("FR_DENIED\n"); break;
-		case FR_EXIST: printf("FR_EXIST\n"); break;
-		case FR_INVALID_OBJECT: printf("FR_INVALID_OBJECT\n"); break;
-		case FR_WRITE_PROTECTED: printf("FR_WRITE_PROTECTED\n"); break;
-		case FR_INVALID_DRIVE: printf("FR_INVALID_DRIVE\n"); break;
-		case FR_NOT_ENABLED: printf("FR_NOT_ENABLED\n"); break;
-		case FR_NO_FILESYSTEM: printf("FR_NO_FILESYSTEM\n"); break;
-		case FR_MKFS_ABORTED: printf("FR_MKFS_ABORTED\n"); break;
-		case FR_TIMEOUT: printf("FR_TIMEOUT\n"); break;
-		case FR_LOCKED: printf("FR_LOCKED\n"); break;
-		case FR_NOT_ENOUGH_CORE: printf("FR_NOT_ENOUGH_CORE\n"); break;
-		case FR_TOO_MANY_OPEN_FILES: printf("FR_TOO_MANY_OPEN_FILES\n"); break;
-		case FR_INVALID_PARAMETER: printf("FR_INVALID_PARAMETER\n"); break;
-		default: printf("result code unknown (%d = 0x%X)\n",r,r);
-	}
+  switch (r)
+  {
+  case FR_OK:
+    printf("FR_OK\n");
+    break;
+  case FR_DISK_ERR:
+    printf("FR_DISK_ERR\n");
+    break;
+  case FR_INT_ERR:
+    printf("FR_INT_ERR\n");
+    break;
+  case FR_NOT_READY:
+    printf("FR_NOT_READY\n");
+    break;
+  case FR_NO_FILE:
+    printf("FR_NO_FILE\n");
+    break;
+  case FR_NO_PATH:
+    printf("FR_NO_PATH\n");
+    break;
+  case FR_INVALID_NAME:
+    printf("FR_INVALID_NAME\n");
+    break;
+  case FR_DENIED:
+    printf("FR_DENIED\n");
+    break;
+  case FR_EXIST:
+    printf("FR_EXIST\n");
+    break;
+  case FR_INVALID_OBJECT:
+    printf("FR_INVALID_OBJECT\n");
+    break;
+  case FR_WRITE_PROTECTED:
+    printf("FR_WRITE_PROTECTED\n");
+    break;
+  case FR_INVALID_DRIVE:
+    printf("FR_INVALID_DRIVE\n");
+    break;
+  case FR_NOT_ENABLED:
+    printf("FR_NOT_ENABLED\n");
+    break;
+  case FR_NO_FILESYSTEM:
+    printf("FR_NO_FILESYSTEM\n");
+    break;
+  case FR_MKFS_ABORTED:
+    printf("FR_MKFS_ABORTED\n");
+    break;
+  case FR_TIMEOUT:
+    printf("FR_TIMEOUT\n");
+    break;
+  case FR_LOCKED:
+    printf("FR_LOCKED\n");
+    break;
+  case FR_NOT_ENOUGH_CORE:
+    printf("FR_NOT_ENOUGH_CORE\n");
+    break;
+  case FR_TOO_MANY_OPEN_FILES:
+    printf("FR_TOO_MANY_OPEN_FILES\n");
+    break;
+  case FR_INVALID_PARAMETER:
+    printf("FR_INVALID_PARAMETER\n");
+    break;
+  default:
+    printf("result code unknown (%d = 0x%X)\n", r, r);
+  }
 }
-
 
 /**
   * @brief  Manages the DMA Half Transfer complete interrupt.
@@ -544,7 +570,7 @@ static void f_disp_res(FRESULT r)
   * @retval None
   */
 void BSP_AUDIO_OUT_HalfTransfer_CallBack(void)
-{ 
+{
   buf_offs = BUFFER_OFFSET_HALF;
 }
 
@@ -556,11 +582,8 @@ void BSP_AUDIO_OUT_HalfTransfer_CallBack(void)
 void BSP_AUDIO_OUT_TransferComplete_CallBack(void)
 {
   buf_offs = BUFFER_OFFSET_FULL;
-  BSP_AUDIO_OUT_ChangeBuffer((uint16_t*)&out_buffer[0], OUT_BUFFER_SIZE / 2);
+  BSP_AUDIO_OUT_ChangeBuffer((uint16_t *)&out_buffer[0], OUT_BUFFER_SIZE / 2);
 }
-
-
-
 
 /* USER CODE END 4 */
 
@@ -571,7 +594,7 @@ void BSP_AUDIO_OUT_TransferComplete_CallBack(void)
   * @retval None
   */
 /* USER CODE END Header_StartDefaultTask */
-void StartDefaultTask(void const * argument)
+void StartDefaultTask(void const *argument)
 {
   /* init code for USB_HOST */
   MX_USB_HOST_Init();
@@ -580,120 +603,82 @@ void StartDefaultTask(void const * argument)
   MX_FATFS_Init();
 
   /* USER CODE BEGIN 5 */
-  
+
   HAL_GPIO_WritePin(OTG_FS_PowerSwitchOn_GPIO_Port, OTG_FS_PowerSwitchOn_Pin, GPIO_PIN_RESET);
-  
+
   vTaskDelay(1000);
-  
+
   xprintf("waiting for USB mass storage\n");
-  
+
   do
   {
-	  xprintf(".");
-	  vTaskDelay(250);
-  }while(Appli_state != APPLICATION_READY);
-  
-  
+    xprintf(".");
+    vTaskDelay(250);
+  } while (Appli_state != APPLICATION_READY);
+
   FRESULT res;
-  
-  res = f_open(&file,"0:/sound.mp3",FA_READ);
-  
-  if(res==FR_OK)
+
+  res = f_open(&file, "0:/sound.mp3", FA_READ);
+
+  if (res == FR_OK)
   {
-	  xprintf("wave file open OK\n");
+    xprintf("wave file open OK\n");
   }
   else
   {
-	  xprintf("wave file open ERROR, res = %d\n",res);
-	  f_disp_res(res);
-	  while(1);
+    xprintf("wave file open ERROR, res = %d\n", res);
+    f_disp_res(res);
+    while (1)
+      ;
   }
-  
-  if(BSP_AUDIO_OUT_Init(OUTPUT_DEVICE_AUTO,70,44100) == 0)
+
+  if (BSP_AUDIO_OUT_Init(OUTPUT_DEVICE_AUTO, 70, 44100) == 0)
   {
-	  xprintf("audio init OK\n");
+    xprintf("audio init OK\n");
   }
   else
   {
-	  xprintf("audio init ERROR\n");
+    xprintf("audio init ERROR\n");
   }
-  
+
   hMP3Decoder = MP3InitDecoder();
-	read_pointer = NULL;
-  
+  read_pointer = NULL;
+
   /* Infinite loop */
-  
-  for(;;)
+
+  for (;;)
   {
-	  
-	char key = debug_inkey();
-	
-	switch(key)
-	{
-		case 'p':
-		{
-			xprintf("play command...\n");
-			if(player_state) {xprintf("already playing\n"); break;}
-			player_state = 1;
-			BSP_AUDIO_OUT_Play((uint16_t*)&out_buffer[0],OUT_BUFFER_SIZE);
-			fpos = 0;
-			buf_offs = BUFFER_OFFSET_NONE;
-			break;
-		}
-	}
-	
-	if(player_state)
-	{
-		uint32_t br;
-		 mp3_proccess(&file);
-		/*
-    if(buf_offs == BUFFER_OFFSET_HALF)
-		{
 
-    
-		  if(f_read(&file, 
-					&buff[0], 
-					OUT_BUFFER_SIZE/2,
-					(void *)&br) != FR_OK)
-		  { 
-			BSP_AUDIO_OUT_Stop(CODEC_PDWN_SW); 
-			xprintf("f_read error on half\n");
-		  }
-		  buf_offs = BUFFER_OFFSET_NONE;
-		  fpos += br;
-    
-		  
-		}
-		
-		if(buf_offs == BUFFER_OFFSET_FULL)
-		{
-			if(f_read(&file, 
-					&buff[OUT_BUFFER_SIZE /2], 
-					OUT_BUFFER_SIZE/2, 
-					(void *)&br) != FR_OK)
-			{ 
-				BSP_AUDIO_OUT_Stop(CODEC_PDWN_SW); 
-				xprintf("f_read error on full\n");
-			} 
+    char key = debug_inkey();
 
-			buf_offs = BUFFER_OFFSET_NONE;
-			fpos += br; 
-		}
+    switch (key)
+    {
+    case 'p':
+    {
+      xprintf("play command...\n");
+      if (player_state)
+      {
+        xprintf("already playing\n");
+        break;
+      }
+      player_state = 1;
+      BSP_AUDIO_OUT_Play((uint16_t *)&out_buffer[0], OUT_BUFFER_SIZE);
+      read_pointer = read_buffer;
+      buf_offs = BUFFER_OFFSET_NONE;
 
-		if( br < OUT_BUFFER_SIZE/2 )
-		{
-			xprintf("stop at eof\n");
-			BSP_AUDIO_OUT_Stop(CODEC_PDWN_SW); 
-			player_state = 0;
-		}
-	}  //if(player_state)
-	  */
-	vTaskDelay(2);
-	  
+      break;
+    }
+    }
+
+    if (player_state)
+    {
+      uint32_t br;
+      mp3_proccess(&file);
+      vTaskDelay(2);
+    }
+
+    /* USER CODE END 5 */
   }
-  
-  /* USER CODE END 5 */ 
-}
 }
 
 /**
@@ -709,7 +694,8 @@ void HAL_TIM_PeriodElapsedCallback(TIM_HandleTypeDef *htim)
   /* USER CODE BEGIN Callback 0 */
 
   /* USER CODE END Callback 0 */
-  if (htim->Instance == TIM7) {
+  if (htim->Instance == TIM7)
+  {
     HAL_IncTick();
   }
   /* USER CODE BEGIN Callback 1 */
@@ -727,124 +713,144 @@ void _Error_Handler(char *file, int line)
 {
   /* USER CODE BEGIN Error_Handler_Debug */
   /* User can add his own implementation to report the HAL error return state */
-  while(1)
+  while (1)
   {
   }
   /* USER CODE END Error_Handler_Debug */
 }
 
-int mp3_proccess(FIL *mp3_file){
-  	MP3FrameInfo mp3FrameInfo;
+int mp3_proccess(FIL *mp3_file)
+{
+  MP3FrameInfo mp3FrameInfo;
 
-	if (read_pointer == NULL) {
-		if(refill_inbuffer(mp3_file) != 0){
-			return END_OF_FILE;
-		}
-	}
+  if (read_pointer == NULL)
+  {
+    if (refill_inbuffer(mp3_file) != 0)
+    {
+      return END_OF_FILE;
+    }
+  }
 
-	offset = MP3FindSyncWord(read_pointer, bytes_left);
-	while(offset < 0) {
-		if(refill_inbuffer(mp3_file) != 0)
-			return END_OF_FILE;
-		if(bytes_left > 0){
-			bytes_left -= 1;
-			read_pointer += 1;
-		}
-		offset = MP3FindSyncWord(read_pointer, bytes_left);
-	}
-	read_pointer += offset;
-	bytes_left -= offset;
-	bytes_left_before_decoding = bytes_left;
+  offset = MP3FindSyncWord(read_pointer, bytes_left);
+  while (offset < 0)
+  {
+    xprintf("!");
 
-	if (MP3GetNextFrameInfo(hMP3Decoder, &mp3FrameInfo, read_pointer) == 0 &&
-			mp3FrameInfo.nChans == 2 &&
-			mp3FrameInfo.version == 0) {
-		//debug_printf("Found a frame at offset %x\n", offset + read_ptr - mp3buf + mp3file->fptr);
-	} else {
-		// advance data pointer
-		// TODO: handle bytes_left == 0
-		if(bytes_left > 0){
-			bytes_left -= 1;
-			read_pointer += 1;
-		}
-		return 0;
-	}
+    if (refill_inbuffer(mp3_file) != 0)
+      return END_OF_FILE;
+    if (bytes_left > 0)
+    {
+      bytes_left -= 1;
+      read_pointer += 1;
+    }
+    offset = MP3FindSyncWord(read_pointer, bytes_left);
+  }
+  read_pointer += offset;
+  bytes_left -= offset;
 
-	if (bytes_left < MAINBUF_SIZE) {
-		if(refill_inbuffer(mp3_file) != 0)
-			return END_OF_FILE;
-	}
+  if (MP3GetNextFrameInfo(hMP3Decoder, &mp3FrameInfo, read_pointer) == 0 &&
+      mp3FrameInfo.nChans == 2 &&
+      mp3FrameInfo.version == 0)
+  {
+    //debug_printf("Found a frame at offset %x\n", offset + read_ptr - mp3buf + mp3file->fptr);
+  }
+  else
+  {
+    //nigdy tu nie wpada
+    // advance data pointer
+    // TODO: handle bytes_left == 0
+    if (bytes_left > 0)
+    {
+      bytes_left -= 1;
+      read_pointer += 1;
+    }
+    return 0;
+  }
 
-	if(buf_offs == (BUFFER_OFFSET_HALF | BUFFER_OFFSET_FULL)){
-			underflows++;
-			//DAC_DMA_disable();
-	}
+  if (bytes_left < MAINBUF_SIZE)
+  {
 
-	if(buf_offs == (BUFFER_OFFSET_HALF)){
-		result = MP3Decode(hMP3Decoder, &read_pointer, &bytes_left, out_buffer, 0);
-		buf_offs = BUFFER_OFFSET_NONE;
-	}
-	if(buf_offs == (BUFFER_OFFSET_FULL)){
-		result = MP3Decode(hMP3Decoder, &read_pointer, &bytes_left, &out_buffer[2048], 0);
-		buf_offs = BUFFER_OFFSET_NONE;
-	}
+    if (refill_inbuffer(mp3_file) != 0)
+      return END_OF_FILE;
+  }
 
-	//DAC_DMA_enable();
-	if(result != ERR_MP3_NONE){
-		switch(result){
-		case ERR_MP3_INDATA_UNDERFLOW:
-			bytes_left = 0;
-			if(refill_inbuffer(mp3_file) != 0)
-				return END_OF_FILE;
-			break;
-		case ERR_MP3_MAINDATA_UNDERFLOW:
-			//do nothing, next call to MP3Decode will provide more data
-			break;
-		default:
-			return 0; //skip this frame if error
-			//return END_OF_FILE; //skip this file if error
-		}
-	}
-	return 0;
+  if (buf_offs == (BUFFER_OFFSET_HALF))
+  {
+    xprintf("%d---\n", bytes_left);
+    result = MP3Decode(hMP3Decoder, &read_pointer, &bytes_left, out_buffer, 0);
+  }
+  if (buf_offs == (BUFFER_OFFSET_FULL))
+  {
+    xprintf("%d+++\n", bytes_left);
 
+    result = MP3Decode(hMP3Decoder, &read_pointer, &bytes_left, &out_buffer[OUT_BUFFER_SIZE / 2], 0);
+  }
 
-
-
+  //DAC_DMA_enable();
+  if (result != ERR_MP3_NONE)
+  {
+    switch (result)
+    {
+    case ERR_MP3_INDATA_UNDERFLOW:
+      bytes_left = 0;
+      if (refill_inbuffer(mp3_file) != 0)
+        return END_OF_FILE;
+      break;
+    case ERR_MP3_MAINDATA_UNDERFLOW:
+      //do nothing, next call to MP3Decode will provide more data
+      break;
+    default:
+      return 0; //skip this frame if error
+                //return END_OF_FILE; //skip this file if error
+    }
+  }
+  return 0;
 }
-
-
 
 int refill_inbuffer(FIL *in_file)
 {
-	unsigned int bytes_read;
-	unsigned int bytes_to_read;
-	FRESULT result;
+  unsigned int bytes_read;
+  unsigned int bytes_to_read;
+  FRESULT result;
 
-	if (bytes_left > 0) {
-		//copy remaining data to beginning of buffer
-		memcpy(read_buffer, read_pointer, bytes_left);
-	}
+  if (bytes_left > 0)
+  {
 
-	bytes_to_read = READ_BUFFER_SIZE - bytes_left;
+    //copy remaining data to beginning of buffer
+    //    copy to  / copy from   /count
+    //xprintf("%d,",bytes_left);
+    memcpy(read_buffer, read_pointer, bytes_left);
+  }
 
-	result = f_read(in_file, (BYTE *)read_buffer + bytes_left, bytes_to_read, &bytes_read);
-	if(result != FR_OK)
-		return READ_ERROR;
+  bytes_to_read = READ_BUFFER_SIZE - bytes_left;
+  // xprintf("%d,",bytes_to_read );
 
-	if (bytes_read == bytes_to_read){
-		read_pointer = read_buffer;
-		offset = 0;
-		bytes_left = READ_BUFFER_SIZE;
-		return 0;
-	}
-	else{
-		return END_OF_FILE;
-	}
+  // * [IN] File object */
+  //   void* buff,  /* [OUT] Buffer to store read data */
+  //   UINT btr,    /* [IN] Number of bytes to read */
+  //   UINT* br     /* [OUT] Number of bytes read */
+  result = f_read(in_file, (BYTE *)read_buffer + bytes_left, bytes_to_read, &bytes_read);
+  //xprintf(":%d,\n",bytes_read );
 
-	return 0;  //should never reach this point
+  if (result != FR_OK)
+    return READ_ERROR;
+
+  if (bytes_read == bytes_to_read)
+  {
+    read_pointer = read_buffer;
+    //offset = 0;
+    bytes_left = READ_BUFFER_SIZE;
+    return 0;
+  }
+  else
+  {
+    return END_OF_FILE;
+  }
+
+  return 0; //should never reach this point
 }
 
-#ifdef  USE_FULL_ASSERT
+#ifdef USE_FULL_ASSERT
 /**
   * @brief  Reports the name of the source file and the source line number
   *         where the assert_param error has occurred.
@@ -852,8 +858,8 @@ int refill_inbuffer(FIL *in_file)
   * @param  line: assert_param error line source number
   * @retval None
   */
-void assert_failed(uint8_t* file, uint32_t line)
-{ 
+void assert_failed(uint8_t *file, uint32_t line)
+{
   /* USER CODE BEGIN 6 */
   /* User can add his own implementation to report the file name and line number,
      tex: printf("Wrong parameters value: file %s on line %d\r\n", file, line) */
