@@ -11,6 +11,18 @@
                 "_UNICODE"
             ],
             "intelliSenseMode": "msvc-x64"
+        },
+        {
+            "name": "brzoza",
+            "includePath": [
+                "${workspaceFolder}/**"
+            ],
+            "defines": [
+                "_DEBUG",
+                "UNICODE",
+                "_UNICODE"
+            ],
+            "intelliSenseMode": "msvc-x64"
         }
     ],
     "version": 4

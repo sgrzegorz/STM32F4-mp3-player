@@ -47,9 +47,11 @@
   ******************************************************************************
   */
 /* Includes ------------------------------------------------------------------*/
-#define READ_BUFFER_SIZE	2 * MAINBUF_SIZE + 216
+#define READ_BUFFER_SIZE	(2 * MAINBUF_SIZE + 216) //4096
 #define DECODED_MP3_FRAME_SIZE	MAX_NGRAN * MAX_NCHAN * MAX_NSAMP
-#define OUT_BUFFER_SIZE			2 * DECODED_MP3_FRAME_SIZE
+//#define OUT_BUFFER_SIZE			2 * DECODED_MP3_FRAME_SIZE//
+#define OUT_BUFFER_SIZE			READ_BUFFER_SIZE*2
+
 #define END_OF_FILE	-1
 #define READ_ERROR	-2
 #include "main.h"
@@ -69,7 +71,7 @@
 #include "term_io.h"
 #include "dbgu.h"
 
-static HMP3Decoder hMP3Decoder;
+HMP3Decoder hMP3Decoder;
 static unsigned char *read_pointer;
 static unsigned char read_buffer[READ_BUFFER_SIZE];
 static int offset;
@@ -303,7 +305,8 @@ static void MX_I2S3_Init(void)
   hi2s3.Init.Standard = I2S_STANDARD_PHILIPS;
   hi2s3.Init.DataFormat = I2S_DATAFORMAT_16B;
   hi2s3.Init.MCLKOutput = I2S_MCLKOUTPUT_ENABLE;
-  hi2s3.Init.AudioFreq = I2S_AUDIOFREQ_96K;
+  // 
+hi2s3.Init.AudioFreq = I2S_AUDIOFREQ_96K;
   hi2s3.Init.CPOL = I2S_CPOL_LOW;
   hi2s3.Init.ClockSource = I2S_CLOCK_PLL;
   hi2s3.Init.FullDuplexMode = I2S_FULLDUPLEXMODE_DISABLE;
@@ -546,6 +549,7 @@ static void f_disp_res(FRESULT r)
 void BSP_AUDIO_OUT_HalfTransfer_CallBack(void)
 { 
   buf_offs = BUFFER_OFFSET_HALF;
+
 }
 
 /**
@@ -626,74 +630,33 @@ void StartDefaultTask(void const * argument)
   for(;;)
   {
 	  
-	char key = debug_inkey();
-	
-	switch(key)
-	{
-		case 'p':
-		{
-			xprintf("play command...\n");
-			if(player_state) {xprintf("already playing\n"); break;}
-			player_state = 1;
-			BSP_AUDIO_OUT_Play((uint16_t*)&out_buffer[0],OUT_BUFFER_SIZE);
-			fpos = 0;
-			buf_offs = BUFFER_OFFSET_NONE;
-			break;
-		}
-	}
-	
-	if(player_state)
-	{
-		uint32_t br;
-		 mp3_proccess(&file);
-		/*
-    if(buf_offs == BUFFER_OFFSET_HALF)
-		{
-
+    char key = debug_inkey();
     
-		  if(f_read(&file, 
-					&buff[0], 
-					OUT_BUFFER_SIZE/2,
-					(void *)&br) != FR_OK)
-		  { 
-			BSP_AUDIO_OUT_Stop(CODEC_PDWN_SW); 
-			xprintf("f_read error on half\n");
-		  }
-		  buf_offs = BUFFER_OFFSET_NONE;
-		  fpos += br;
+    switch(key)
+    {
+      case 'p':
+      {
+        xprintf("play command...\n");
+        if(player_state) {xprintf("already playing\n"); break;}
+        player_state = 1;
+        BSP_AUDIO_OUT_Play((uint16_t*)&out_buffer[0],OUT_BUFFER_SIZE);
+        read_pointer = read_buffer;
+        buf_offs = BUFFER_OFFSET_NONE;
+
+        break;
+      }
+    }
     
-		  
-		}
-		
-		if(buf_offs == BUFFER_OFFSET_FULL)
-		{
-			if(f_read(&file, 
-					&buff[OUT_BUFFER_SIZE /2], 
-					OUT_BUFFER_SIZE/2, 
-					(void *)&br) != FR_OK)
-			{ 
-				BSP_AUDIO_OUT_Stop(CODEC_PDWN_SW); 
-				xprintf("f_read error on full\n");
-			} 
-
-			buf_offs = BUFFER_OFFSET_NONE;
-			fpos += br; 
-		}
-
-		if( br < OUT_BUFFER_SIZE/2 )
-		{
-			xprintf("stop at eof\n");
-			BSP_AUDIO_OUT_Stop(CODEC_PDWN_SW); 
-			player_state = 0;
-		}
-	}  //if(player_state)
-	  */
-	vTaskDelay(2);
-	  
-  }
+    if(player_state)
+    {
+      uint32_t br;
+      mp3_proccess(&file);
+      vTaskDelay(2);  
+    }
   
   /* USER CODE END 5 */ 
-}
+  }
+  
 }
 
 /**
@@ -744,6 +707,8 @@ int mp3_proccess(FIL *mp3_file){
 
 	offset = MP3FindSyncWord(read_pointer, bytes_left);
 	while(offset < 0) {
+         xprintf("!");
+
 		if(refill_inbuffer(mp3_file) != 0)
 			return END_OF_FILE;
 		if(bytes_left > 0){
@@ -754,38 +719,39 @@ int mp3_proccess(FIL *mp3_file){
 	}
 	read_pointer += offset;
 	bytes_left -= offset;
-	bytes_left_before_decoding = bytes_left;
 
 	if (MP3GetNextFrameInfo(hMP3Decoder, &mp3FrameInfo, read_pointer) == 0 &&
 			mp3FrameInfo.nChans == 2 &&
 			mp3FrameInfo.version == 0) {
 		//debug_printf("Found a frame at offset %x\n", offset + read_ptr - mp3buf + mp3file->fptr);
 	} else {
+    //nigdy tu nie wpada
 		// advance data pointer
 		// TODO: handle bytes_left == 0
 		if(bytes_left > 0){
 			bytes_left -= 1;
 			read_pointer += 1;
+      
 		}
 		return 0;
 	}
 
 	if (bytes_left < MAINBUF_SIZE) {
+
 		if(refill_inbuffer(mp3_file) != 0)
 			return END_OF_FILE;
 	}
 
-	if(buf_offs == (BUFFER_OFFSET_HALF | BUFFER_OFFSET_FULL)){
-			underflows++;
-			//DAC_DMA_disable();
-	}
 
 	if(buf_offs == (BUFFER_OFFSET_HALF)){
+    xprintf("%d---\n",bytes_left);
 		result = MP3Decode(hMP3Decoder, &read_pointer, &bytes_left, out_buffer, 0);
 		buf_offs = BUFFER_OFFSET_NONE;
 	}
 	if(buf_offs == (BUFFER_OFFSET_FULL)){
-		result = MP3Decode(hMP3Decoder, &read_pointer, &bytes_left, &out_buffer[2048], 0);
+        xprintf("%d+++\n",bytes_left);
+
+		result = MP3Decode(hMP3Decoder, &read_pointer, &bytes_left, &out_buffer[OUT_BUFFER_SIZE/2], 0);
 		buf_offs = BUFFER_OFFSET_NONE;
 	}
 
@@ -807,9 +773,6 @@ int mp3_proccess(FIL *mp3_file){
 	}
 	return 0;
 
-
-
-
 }
 
 
@@ -821,19 +784,29 @@ int refill_inbuffer(FIL *in_file)
 	FRESULT result;
 
 	if (bytes_left > 0) {
+
 		//copy remaining data to beginning of buffer
+    //    copy to  / copy from   /count
+    //xprintf("%d,",bytes_left);
 		memcpy(read_buffer, read_pointer, bytes_left);
 	}
 
 	bytes_to_read = READ_BUFFER_SIZE - bytes_left;
+     // xprintf("%d,",bytes_to_read );
 
+// * [IN] File object */
+//   void* buff,  /* [OUT] Buffer to store read data */
+//   UINT btr,    /* [IN] Number of bytes to read */
+//   UINT* br     /* [OUT] Number of bytes read */
 	result = f_read(in_file, (BYTE *)read_buffer + bytes_left, bytes_to_read, &bytes_read);
+       //xprintf(":%d,\n",bytes_read );
+
 	if(result != FR_OK)
 		return READ_ERROR;
 
 	if (bytes_read == bytes_to_read){
 		read_pointer = read_buffer;
-		offset = 0;
+		//offset = 0;
 		bytes_left = READ_BUFFER_SIZE;
 		return 0;
 	}
