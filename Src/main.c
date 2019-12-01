@@ -47,13 +47,13 @@
   ******************************************************************************
   */
 /* Includes ------------------------------------------------------------------*/
-#define READ_BUFFER_SIZE (2 * MAINBUF_SIZE + 216) //4096
-#define DECODED_MP3_FRAME_SIZE MAX_NGRAN *MAX_NCHAN *MAX_NSAMP
+#define READ_BUFFER_SIZE	(2 * MAINBUF_SIZE + 216) //4096
+#define DECODED_MP3_FRAME_SIZE	MAX_NGRAN * MAX_NCHAN * MAX_NSAMP
 //#define OUT_BUFFER_SIZE			2 * DECODED_MP3_FRAME_SIZE//
-#define OUT_BUFFER_SIZE READ_BUFFER_SIZE * 2
+#define OUT_BUFFER_SIZE			READ_BUFFER_SIZE*2
 
-#define END_OF_FILE -1
-#define READ_ERROR -2
+#define END_OF_FILE	-1
+#define READ_ERROR	-2
 #include "main.h"
 #include "stm32f4xx_hal.h"
 #include "cmsis_os.h"
@@ -297,8 +297,8 @@ static void MX_I2S3_Init(void)
   hi2s3.Init.Standard = I2S_STANDARD_PHILIPS;
   hi2s3.Init.DataFormat = I2S_DATAFORMAT_16B;
   hi2s3.Init.MCLKOutput = I2S_MCLKOUTPUT_ENABLE;
-  //
-  hi2s3.Init.AudioFreq = I2S_AUDIOFREQ_96K;
+  // 
+hi2s3.Init.AudioFreq = I2S_AUDIOFREQ_96K;
   hi2s3.Init.CPOL = I2S_CPOL_LOW;
   hi2s3.Init.ClockSource = I2S_CLOCK_PLL;
   hi2s3.Init.FullDuplexMode = I2S_FULLDUPLEXMODE_DISABLE;
@@ -572,6 +572,7 @@ static void f_disp_res(FRESULT r)
 void BSP_AUDIO_OUT_HalfTransfer_CallBack(void)
 {
   buf_offs = BUFFER_OFFSET_HALF;
+
 }
 
 /**
@@ -648,37 +649,34 @@ void StartDefaultTask(void const *argument)
 
   for (;;)
   {
-
+	  
     char key = debug_inkey();
-
-    switch (key)
+    
+    switch(key)
     {
-    case 'p':
-    {
-      xprintf("play command...\n");
-      if (player_state)
+      case 'p':
       {
-        xprintf("already playing\n");
+        xprintf("play command...\n");
+        if(player_state) {xprintf("already playing\n"); break;}
+        player_state = 1;
+        BSP_AUDIO_OUT_Play((uint16_t*)&out_buffer[0],OUT_BUFFER_SIZE);
+        read_pointer = read_buffer;
+        buf_offs = BUFFER_OFFSET_NONE;
+
         break;
       }
-      player_state = 1;
-      BSP_AUDIO_OUT_Play((uint16_t *)&out_buffer[0], OUT_BUFFER_SIZE);
-      read_pointer = read_buffer;
-      buf_offs = BUFFER_OFFSET_NONE;
-
-      break;
     }
-    }
-
-    if (player_state)
+    
+    if(player_state)
     {
       uint32_t br;
       mp3_proccess(&file);
-      vTaskDelay(2);
+      vTaskDelay(2);  
     }
-
-    /* USER CODE END 5 */
+  
+  /* USER CODE END 5 */ 
   }
+  
 }
 
 /**
@@ -719,135 +717,124 @@ void _Error_Handler(char *file, int line)
   /* USER CODE END Error_Handler_Debug */
 }
 
-int mp3_proccess(FIL *mp3_file)
-{
-  MP3FrameInfo mp3FrameInfo;
+int mp3_proccess(FIL *mp3_file){
+  	MP3FrameInfo mp3FrameInfo;
 
-  if (read_pointer == NULL)
-  {
-    if (refill_inbuffer(mp3_file) != 0)
-    {
-      return END_OF_FILE;
-    }
-  }
+	if (read_pointer == NULL) {
+		if(refill_inbuffer(mp3_file) != 0){
+			return END_OF_FILE;
+		}
+	}
 
-  offset = MP3FindSyncWord(read_pointer, bytes_left);
-  while (offset < 0)
-  {
-    xprintf("!");
+	offset = MP3FindSyncWord(read_pointer, bytes_left);
+	while(offset < 0) {
+         xprintf("!");
 
-    if (refill_inbuffer(mp3_file) != 0)
-      return END_OF_FILE;
-    if (bytes_left > 0)
-    {
-      bytes_left -= 1;
-      read_pointer += 1;
-    }
-    offset = MP3FindSyncWord(read_pointer, bytes_left);
-  }
-  read_pointer += offset;
-  bytes_left -= offset;
+		if(refill_inbuffer(mp3_file) != 0)
+			return END_OF_FILE;
+		if(bytes_left > 0){
+			bytes_left -= 1;
+			read_pointer += 1;
+		}
+		offset = MP3FindSyncWord(read_pointer, bytes_left);
+	}
+	read_pointer += offset;
+	bytes_left -= offset;
 
-  if (MP3GetNextFrameInfo(hMP3Decoder, &mp3FrameInfo, read_pointer) == 0 &&
-      mp3FrameInfo.nChans == 2 &&
-      mp3FrameInfo.version == 0)
-  {
-    //debug_printf("Found a frame at offset %x\n", offset + read_ptr - mp3buf + mp3file->fptr);
-  }
-  else
-  {
+	if (MP3GetNextFrameInfo(hMP3Decoder, &mp3FrameInfo, read_pointer) == 0 &&
+			mp3FrameInfo.nChans == 2 &&
+			mp3FrameInfo.version == 0) {
+		//debug_printf("Found a frame at offset %x\n", offset + read_ptr - mp3buf + mp3file->fptr);
+	} else {
     //nigdy tu nie wpada
-    // advance data pointer
-    // TODO: handle bytes_left == 0
-    if (bytes_left > 0)
-    {
-      bytes_left -= 1;
-      read_pointer += 1;
-    }
-    return 0;
-  }
+		// advance data pointer
+		// TODO: handle bytes_left == 0
+		if(bytes_left > 0){
+			bytes_left -= 1;
+			read_pointer += 1;
+      
+		}
+		return 0;
+	}
 
-  if (bytes_left < MAINBUF_SIZE)
-  {
+	if (bytes_left < MAINBUF_SIZE) {
 
-    if (refill_inbuffer(mp3_file) != 0)
-      return END_OF_FILE;
-  }
+		if(refill_inbuffer(mp3_file) != 0)
+			return END_OF_FILE;
+	}
 
-  if (buf_offs == (BUFFER_OFFSET_HALF))
-  {
-    xprintf("%d---\n", bytes_left);
-    result = MP3Decode(hMP3Decoder, &read_pointer, &bytes_left, out_buffer, 0);
-  }
-  if (buf_offs == (BUFFER_OFFSET_FULL))
-  {
-    xprintf("%d+++\n", bytes_left);
 
-    result = MP3Decode(hMP3Decoder, &read_pointer, &bytes_left, &out_buffer[OUT_BUFFER_SIZE / 2], 0);
-  }
+	if(buf_offs == (BUFFER_OFFSET_HALF)){
+    xprintf("%d---\n",bytes_left);
+		result = MP3Decode(hMP3Decoder, &read_pointer, &bytes_left, out_buffer, 0);
+		buf_offs = BUFFER_OFFSET_NONE;
+	}
+	if(buf_offs == (BUFFER_OFFSET_FULL)){
+        xprintf("%d+++\n",bytes_left);
 
-  //DAC_DMA_enable();
-  if (result != ERR_MP3_NONE)
-  {
-    switch (result)
-    {
-    case ERR_MP3_INDATA_UNDERFLOW:
-      bytes_left = 0;
-      if (refill_inbuffer(mp3_file) != 0)
-        return END_OF_FILE;
-      break;
-    case ERR_MP3_MAINDATA_UNDERFLOW:
-      //do nothing, next call to MP3Decode will provide more data
-      break;
-    default:
-      return 0; //skip this frame if error
-                //return END_OF_FILE; //skip this file if error
-    }
-  }
-  return 0;
+		result = MP3Decode(hMP3Decoder, &read_pointer, &bytes_left, &out_buffer[OUT_BUFFER_SIZE/2], 0);
+		buf_offs = BUFFER_OFFSET_NONE;
+	}
+
+	//DAC_DMA_enable();
+	if(result != ERR_MP3_NONE){
+		switch(result){
+		case ERR_MP3_INDATA_UNDERFLOW:
+			bytes_left = 0;
+			if(refill_inbuffer(mp3_file) != 0)
+				return END_OF_FILE;
+			break;
+		case ERR_MP3_MAINDATA_UNDERFLOW:
+			//do nothing, next call to MP3Decode will provide more data
+			break;
+		default:
+			return 0; //skip this frame if error
+			//return END_OF_FILE; //skip this file if error
+		}
+	}
+	return 0;
+
 }
+
 
 int refill_inbuffer(FIL *in_file)
 {
-  unsigned int bytes_read;
-  unsigned int bytes_to_read;
-  FRESULT result;
+	unsigned int bytes_read;
+	unsigned int bytes_to_read;
+	FRESULT result;
 
-  if (bytes_left > 0)
-  {
+	if (bytes_left > 0) {
 
-    //copy remaining data to beginning of buffer
+		//copy remaining data to beginning of buffer
     //    copy to  / copy from   /count
     //xprintf("%d,",bytes_left);
-    memcpy(read_buffer, read_pointer, bytes_left);
-  }
+		memcpy(read_buffer, read_pointer, bytes_left);
+	}
 
-  bytes_to_read = READ_BUFFER_SIZE - bytes_left;
-  // xprintf("%d,",bytes_to_read );
+	bytes_to_read = READ_BUFFER_SIZE - bytes_left;
+     // xprintf("%d,",bytes_to_read );
 
-  // * [IN] File object */
-  //   void* buff,  /* [OUT] Buffer to store read data */
-  //   UINT btr,    /* [IN] Number of bytes to read */
-  //   UINT* br     /* [OUT] Number of bytes read */
-  result = f_read(in_file, (BYTE *)read_buffer + bytes_left, bytes_to_read, &bytes_read);
-  //xprintf(":%d,\n",bytes_read );
+// * [IN] File object */
+//   void* buff,  /* [OUT] Buffer to store read data */
+//   UINT btr,    /* [IN] Number of bytes to read */
+//   UINT* br     /* [OUT] Number of bytes read */
+	result = f_read(in_file, (BYTE *)read_buffer + bytes_left, bytes_to_read, &bytes_read);
+       //xprintf(":%d,\n",bytes_read );
 
-  if (result != FR_OK)
-    return READ_ERROR;
+	if(result != FR_OK)
+		return READ_ERROR;
 
-  if (bytes_read == bytes_to_read)
-  {
-    read_pointer = read_buffer;
-    //offset = 0;
-    bytes_left = READ_BUFFER_SIZE;
-    return 0;
-  }
-  else
-  {
-    return END_OF_FILE;
-  }
+	if (bytes_read == bytes_to_read){
+		read_pointer = read_buffer;
+		//offset = 0;
+		bytes_left = READ_BUFFER_SIZE;
+		return 0;
+	}
+	else{
+		return END_OF_FILE;
+	}
 
-  return 0; //should never reach this point
+	return 0;  //should never reach this point
 }
 
 #ifdef USE_FULL_ASSERT
