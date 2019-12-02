@@ -572,6 +572,9 @@ static void f_disp_res(FRESULT r)
 void BSP_AUDIO_OUT_HalfTransfer_CallBack(void)
 {
   buf_offs = BUFFER_OFFSET_HALF;
+   if(mp3_proccess(&file)!=0){
+
+   }
 
 }
 
@@ -583,7 +586,10 @@ void BSP_AUDIO_OUT_HalfTransfer_CallBack(void)
 void BSP_AUDIO_OUT_TransferComplete_CallBack(void)
 {
   buf_offs = BUFFER_OFFSET_FULL;
-  BSP_AUDIO_OUT_ChangeBuffer((uint16_t *)&out_buffer[0], OUT_BUFFER_SIZE / 2);
+  // BSP_AUDIO_OUT_ChangeBuffer((uint16_t *)&out_buffer[0], OUT_BUFFER_SIZE / 2);
+     if(mp3_proccess(&file)!=0){
+
+   }
 }
 
 /* USER CODE END 4 */
@@ -644,6 +650,15 @@ void StartDefaultTask(void const *argument)
 
   hMP3Decoder = MP3InitDecoder();
   read_pointer = NULL;
+
+  if(mp3_proccess(&file)){
+    BSP_AUDIO_OUT_Play((uint16_t*)&out_buffer[0],OUT_BUFFER_SIZE*2);
+    while(1){
+
+    }
+
+  }
+
 
   /* Infinite loop */
 
