@@ -826,7 +826,7 @@ int refill_inbuffer(FIL *in_file)
 
 	if (bytes_read == bytes_to_read){
 		read_pointer = read_buffer;
-		//offset = 0;
+		offset = 0;
 		bytes_left = READ_BUFFER_SIZE;
 		return 0;
 	}
