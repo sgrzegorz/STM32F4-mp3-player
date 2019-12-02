@@ -68,11 +68,19 @@
 #include "term_io.h"
 #include "dbgu.h"
 
-HMP3Decoder hMP3Decoder;
+enum
+{
+  BUFFER_OFFSET_NONE = 0,
+  BUFFER_OFFSET_HALF,
+  BUFFER_OFFSET_FULL,
+};
+
+static HMP3Decoder hMP3Decoder;
 static uint8_t *read_pointer;
 static uint8_t read_buffer[READ_BUFFER_SIZE];
 static int offset;
 static int result;
+static uint8_t buf_offs = BUFFER_OFFSET_NONE ;
 short out_buffer[OUT_BUFFER_SIZE];
 static int underflows = 0;
 static int bytes_left = 0;
@@ -483,16 +491,10 @@ FIL file;
 const char *FNAME = "haltmich.wav";
 extern ApplicationTypeDef Appli_state;
 extern USBH_HandleTypeDef hUsbHostHS;
-enum
-{
-  BUFFER_OFFSET_NONE = 0,
-  BUFFER_OFFSET_HALF,
-  BUFFER_OFFSET_FULL,
-};
+
 #define AUDIO_BUFFER_SIZE 4096
 uint8_t buff[AUDIO_BUFFER_SIZE];
 static uint8_t player_state = 0;
-static uint8_t buf_offs = BUFFER_OFFSET_NONE;
 static uint32_t fpos = 0;
 
 static void f_disp_res(FRESULT r)
