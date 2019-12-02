@@ -47,10 +47,10 @@
   ******************************************************************************
   */
 /* Includes ------------------------------------------------------------------*/
-#define READ_BUFFER_SIZE	(2 * MAINBUF_SIZE + 216) //4096
+#define READ_BUFFER_SIZE	2 * MAINBUF_SIZE  //4096
 #define DECODED_MP3_FRAME_SIZE	MAX_NGRAN * MAX_NCHAN * MAX_NSAMP
 //#define OUT_BUFFER_SIZE			2 * DECODED_MP3_FRAME_SIZE//
-#define OUT_BUFFER_SIZE			READ_BUFFER_SIZE*2
+#define OUT_BUFFER_SIZE			2 * DECODED_MP3_FRAME_SIZE
 
 #define END_OF_FILE	-1
 #define READ_ERROR	-2
@@ -69,8 +69,8 @@
 #include "dbgu.h"
 
 HMP3Decoder hMP3Decoder;
-static unsigned char *read_pointer;
-static unsigned char read_buffer[READ_BUFFER_SIZE];
+static uint8_t *read_pointer;
+static uint8_t read_buffer[READ_BUFFER_SIZE];
 static int offset;
 static int result;
 short out_buffer[OUT_BUFFER_SIZE];
@@ -659,7 +659,7 @@ void StartDefaultTask(void const *argument)
         xprintf("play command...\n");
         if(player_state) {xprintf("already playing\n"); break;}
         player_state = 1;
-        BSP_AUDIO_OUT_Play((uint16_t*)&out_buffer[0],OUT_BUFFER_SIZE);
+        BSP_AUDIO_OUT_Play((uint16_t*)&out_buffer[0],OUT_BUFFER_SIZE*2);
         read_pointer = read_buffer;
         buf_offs = BUFFER_OFFSET_NONE;
 
@@ -772,7 +772,7 @@ int mp3_proccess(FIL *mp3_file){
 	if(buf_offs == (BUFFER_OFFSET_FULL)){
         xprintf("%d+++\n",bytes_left);
 
-		result = MP3Decode(hMP3Decoder, &read_pointer, &bytes_left, &out_buffer[OUT_BUFFER_SIZE/2], 0);
+		result = MP3Decode(hMP3Decoder, &read_pointer, &bytes_left, &out_buffer[DECODED_MP3_FRAME_SIZE], 0);
 		buf_offs = BUFFER_OFFSET_NONE;
 	}
 
