@@ -669,7 +669,7 @@ void StartDefaultTask(void const *argument)
 	{
 		xprintf("Audio Init Error\n");
 	}
-
+	
   hMP3Decoder = MP3InitDecoder();
   read_pointer = NULL;
 
@@ -822,8 +822,7 @@ int mp3_proccess(FIL *mp3_file){
 		switch(result){
 		case ERR_MP3_INDATA_UNDERFLOW:
 			bytes_left = 0;
-			if(refill_inbuffer(mp3_file) != 0)
-				return END_OF_FILE;
+			if(refill_inbuffer(mp3_file) != 0)	return END_OF_FILE;
 			break;
 		case ERR_MP3_MAINDATA_UNDERFLOW:
 			//do nothing, next call to MP3Decode will provide more data
@@ -867,7 +866,7 @@ int refill_inbuffer(FIL *in_file)
 
 	if (bytes_read == bytes_to_read){
 		read_pointer = read_buffer;
-		//offset = 0;
+		offset = 0;
 		bytes_left = READ_BUFFER_SIZE;
 		return 0;
 	}
