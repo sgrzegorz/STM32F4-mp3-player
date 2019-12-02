@@ -573,6 +573,7 @@ void BSP_AUDIO_OUT_HalfTransfer_CallBack(void)
 {
   buf_offs = BUFFER_OFFSET_HALF;
    if(mp3_proccess(&file)!=0){
+      BSP_AUDIO_OUT_Stop(CODEC_PDWN_SW);
 
    }
 
@@ -588,6 +589,7 @@ void BSP_AUDIO_OUT_TransferComplete_CallBack(void)
   buf_offs = BUFFER_OFFSET_FULL;
   // BSP_AUDIO_OUT_ChangeBuffer((uint16_t *)&out_buffer[0], OUT_BUFFER_SIZE / 2);
      if(mp3_proccess(&file)!=0){
+      BSP_AUDIO_OUT_Stop(CODEC_PDWN_SW);
 
    }
 }
@@ -639,14 +641,24 @@ void StartDefaultTask(void const *argument)
       ;
   }
 
-  if (BSP_AUDIO_OUT_Init(OUTPUT_DEVICE_AUTO, 70, 44100) == 0)
-  {
-    xprintf("audio init OK\n");
-  }
-  else
-  {
-    xprintf("audio init ERROR\n");
-  }
+  // if (BSP_AUDIO_OUT_Init(OUTPUT_DEVICE_AUTO, 70, 44100) == 0)
+  // {
+  //   xprintf("audio init OK\n");
+  // }
+  // else
+  // {
+  //   xprintf("audio init ERROR\n");
+  // }
+
+  if(BSP_AUDIO_OUT_Init(OUTPUT_DEVICE_BOTH, 100, AUDIO_FREQUENCY_44K) == 0)
+	{
+	  // BSP_AUDIO_OUT_SetAudioFrameSlot(CODEC_AUDIOFRAME_SLOT_02);
+		xprintf("Audio Init Ok\n");
+	}
+	else
+	{
+		xprintf("Audio Init Error\n");
+	}
 
   hMP3Decoder = MP3InitDecoder();
   read_pointer = NULL;
@@ -656,41 +668,44 @@ void StartDefaultTask(void const *argument)
     while(1){
 
     }
+    BSP_AUDIO_OUT_Stop(CODEC_PDWN_SW);
+		buf_offs = BUFFER_OFFSET_NONE;
+
 
   }
 
 
   /* Infinite loop */
 
-  for (;;)
-  {
+  // for (;;)
+  // {
 	  
-    char key = debug_inkey();
+  //   char key = debug_inkey();
     
-    switch(key)
-    {
-      case 'p':
-      {
-        xprintf("play command...\n");
-        if(player_state) {xprintf("already playing\n"); break;}
-        player_state = 1;
-        BSP_AUDIO_OUT_Play((uint16_t*)&out_buffer[0],OUT_BUFFER_SIZE*2);
-        read_pointer = read_buffer;
-        buf_offs = BUFFER_OFFSET_NONE;
+  //   switch(key)
+  //   {
+  //     case 'p':
+  //     {
+  //       xprintf("play command...\n");
+  //       if(player_state) {xprintf("already playing\n"); break;}
+  //       player_state = 1;
+  //       BSP_AUDIO_OUT_Play((uint16_t*)&out_buffer[0],OUT_BUFFER_SIZE*2);
+  //       read_pointer = read_buffer;
+  //       buf_offs = BUFFER_OFFSET_NONE;
 
-        break;
-      }
-    }
+  //       break;
+  //     }
+  //   }
     
-    if(player_state)
-    {
-      uint32_t br;
-      mp3_proccess(&file);
-      vTaskDelay(2);  
-    }
+  //   if(player_state)
+  //   {
+  //     uint32_t br;
+  //     mp3_proccess(&file);
+  //     vTaskDelay(2);  
+  //   }
   
-  /* USER CODE END 5 */ 
-  }
+  // /* USER CODE END 5 */ 
+  // }
   
 }
 
