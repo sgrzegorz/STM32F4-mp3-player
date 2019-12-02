@@ -574,8 +574,14 @@ void BSP_AUDIO_OUT_HalfTransfer_CallBack(void)
   buf_offs = BUFFER_OFFSET_HALF;
    if(mp3_proccess(&file)!=0){
       BSP_AUDIO_OUT_Stop(CODEC_PDWN_SW);
+      xprintf("BSP_AUDIO_OUT_HalfTransfer_CallBack finished\n");
+
 
    }
+   xprintf("BSP_AUDIO_OUT_HalfTransfer_CallBack\n");
+
+  // BSP_AUDIO_OUT_ChangeBuffer((uint16_t *)&out_buffer[0]+ OUT_BUFFER_SIZE/ 2, OUT_BUFFER_SIZE / 2);
+
 
 }
 
@@ -587,11 +593,15 @@ void BSP_AUDIO_OUT_HalfTransfer_CallBack(void)
 void BSP_AUDIO_OUT_TransferComplete_CallBack(void)
 {
   buf_offs = BUFFER_OFFSET_FULL;
-  // BSP_AUDIO_OUT_ChangeBuffer((uint16_t *)&out_buffer[0], OUT_BUFFER_SIZE / 2);
      if(mp3_proccess(&file)!=0){
       BSP_AUDIO_OUT_Stop(CODEC_PDWN_SW);
-
+      xprintf("BSP_AUDIO_OUT_TransferComplete_CallBack finished\n");
    }
+      xprintf("BSP_AUDIO_OUT_TransferComplete_CallBack\n");
+
+        BSP_AUDIO_OUT_ChangeBuffer((uint16_t *)&out_buffer[0], OUT_BUFFER_SIZE / 2);
+
+
 }
 
 /* USER CODE END 4 */
@@ -650,7 +660,7 @@ void StartDefaultTask(void const *argument)
   //   xprintf("audio init ERROR\n");
   // }
 
-  if(BSP_AUDIO_OUT_Init(OUTPUT_DEVICE_BOTH, 100, AUDIO_FREQUENCY_44K) == 0)
+  if(BSP_AUDIO_OUT_Init(OUTPUT_DEVICE_AUTO, 100, AUDIO_FREQUENCY_44K) == 0)
 	{
 	  // BSP_AUDIO_OUT_SetAudioFrameSlot(CODEC_AUDIOFRAME_SLOT_02);
 		xprintf("Audio Init Ok\n");
@@ -663,14 +673,14 @@ void StartDefaultTask(void const *argument)
   hMP3Decoder = MP3InitDecoder();
   read_pointer = NULL;
 
-  if(mp3_proccess(&file)){
+  if(mp3_proccess(&file)==0){
     BSP_AUDIO_OUT_Play((uint16_t*)&out_buffer[0],OUT_BUFFER_SIZE*2);
     while(1){
-
+        xprintf(".");
+       // vTaskDelay(200);
     }
     BSP_AUDIO_OUT_Stop(CODEC_PDWN_SW);
 		buf_offs = BUFFER_OFFSET_NONE;
-
 
   }
 
@@ -749,7 +759,7 @@ void _Error_Handler(char *file, int line)
 
 int mp3_proccess(FIL *mp3_file){
   	MP3FrameInfo mp3FrameInfo;
-
+  xprintf("find sync word\n");
 	if (read_pointer == NULL) {
 		if(refill_inbuffer(mp3_file) != 0){
 			return END_OF_FILE;
@@ -758,7 +768,6 @@ int mp3_proccess(FIL *mp3_file){
 
 	offset = MP3FindSyncWord(read_pointer, bytes_left);
 	while(offset < 0) {
-         xprintf("!");
 
 		if(refill_inbuffer(mp3_file) != 0)
 			return END_OF_FILE;
@@ -770,6 +779,7 @@ int mp3_proccess(FIL *mp3_file){
 	}
 	read_pointer += offset;
 	bytes_left -= offset;
+  xprintf("MP3GetNextFrameInfo\n");
 
 	if (MP3GetNextFrameInfo(hMP3Decoder, &mp3FrameInfo, read_pointer) == 0 &&
 			mp3FrameInfo.nChans == 2 &&
@@ -793,6 +803,7 @@ int mp3_proccess(FIL *mp3_file){
 			return END_OF_FILE;
 	}
 
+  xprintf("MP3Decode\n");
 
 	if(buf_offs == (BUFFER_OFFSET_HALF)){
     xprintf("%d---\n",bytes_left);
