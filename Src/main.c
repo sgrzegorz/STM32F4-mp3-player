@@ -1,3 +1,4 @@
+// 4 DIODYled callback na jednym owlacza na drugimm wylacza na rozpoczeciu kodowania i zakonczeniu kodowania
 
 /**
   ******************************************************************************
@@ -574,10 +575,9 @@ static void f_disp_res(FRESULT r)
 void BSP_AUDIO_OUT_HalfTransfer_CallBack(void)
 {
   buf_offs = BUFFER_OFFSET_HALF;
-   if(mp3_proccess(&file)!=0){
-      BSP_AUDIO_OUT_Stop(CODEC_PDWN_SW);
-      xprintf("BSP_AUDIO_OUT_HalfTransfer_CallBack finished\n");
-   }
+  //  if(mp3_proccess(&file)!=0){
+  //     BSP_AUDIO_OUT_Stop(CODEC_PDWN_SW);
+  //  }
 
 }
 
@@ -589,10 +589,10 @@ void BSP_AUDIO_OUT_HalfTransfer_CallBack(void)
 void BSP_AUDIO_OUT_TransferComplete_CallBack(void)
 {
   buf_offs = BUFFER_OFFSET_FULL;
-     if(mp3_proccess(&file)!=0){
-      BSP_AUDIO_OUT_Stop(CODEC_PDWN_SW);
-      xprintf("BSP_AUDIO_OUT_TransferComplete_CallBack finished\n");
-   }
+  //    if(mp3_proccess(&file)!=0){
+  //     BSP_AUDIO_OUT_Stop(CODEC_PDWN_SW);
+  //     xprintf("BSP_AUDIO_OUT_TransferComplete_CallBack finished\n");
+  //  }
         BSP_AUDIO_OUT_ChangeBuffer((uint16_t *)&out_buffer[0], OUT_BUFFER_SIZE / 2);
 
 
@@ -645,18 +645,8 @@ void StartDefaultTask(void const *argument)
       ;
   }
 
-  // if (BSP_AUDIO_OUT_Init(OUTPUT_DEVICE_AUTO, 70, 44100) == 0)
-  // {
-  //   xprintf("audio init OK\n");
-  // }
-  // else
-  // {
-  //   xprintf("audio init ERROR\n");
-  // }
-
-  if(BSP_AUDIO_OUT_Init(OUTPUT_DEVICE_AUTO, 100, AUDIO_FREQUENCY_44K) == 0)
+  if(BSP_AUDIO_OUT_Init(OUTPUT_DEVICE_AUTO, 70, AUDIO_FREQUENCY_32K) == 0)
 	{
-	  // BSP_AUDIO_OUT_SetAudioFrameSlot(CODEC_AUDIOFRAME_SLOT_02);
 		xprintf("Audio Init Ok\n");
 	}
 	else
@@ -670,7 +660,10 @@ void StartDefaultTask(void const *argument)
   if(mp3_proccess(&file)==0){
     BSP_AUDIO_OUT_Play((uint16_t*)&out_buffer[0],OUT_BUFFER_SIZE*2);
     while(1){
-       // vTaskDelay(200);
+      if(buf_offs==BUFFER_OFFSET_HALF || buf_offs==BUFFER_OFFSET_FULL){
+        mp3_proccess(&file);
+      }
+      vTaskDelay(1);
     }
     BSP_AUDIO_OUT_Stop(CODEC_PDWN_SW);
 		buf_offs = BUFFER_OFFSET_NONE;
@@ -733,7 +726,6 @@ void HAL_TIM_PeriodElapsedCallback(TIM_HandleTypeDef *htim)
 
   /* USER CODE END Callback 1 */
 }
-
 /**
   * @brief  This function is executed in case of error occurrence.
   * @param  file: The file name as string.
@@ -785,7 +777,6 @@ int mp3_proccess(FIL *mp3_file){
 	}
 
 	if (bytes_left < MAINBUF_SIZE) {
-
 		if(refill_inbuffer(mp3_file) != 0)
 			return END_OF_FILE;
 	}
@@ -797,7 +788,7 @@ int mp3_proccess(FIL *mp3_file){
 	}
 	if(buf_offs == (BUFFER_OFFSET_FULL)){
 		result = MP3Decode(hMP3Decoder, &read_pointer, &bytes_left, &out_buffer[DECODED_MP3_FRAME_SIZE], 0);
-		buf_offs = BUFFER_OFFSET_NONE;
+    buf_offs = BUFFER_OFFSET_NONE;
 	}
 
 	if(result != ERR_MP3_NONE){
