@@ -577,13 +577,7 @@ void BSP_AUDIO_OUT_HalfTransfer_CallBack(void)
    if(mp3_proccess(&file)!=0){
       BSP_AUDIO_OUT_Stop(CODEC_PDWN_SW);
       xprintf("BSP_AUDIO_OUT_HalfTransfer_CallBack finished\n");
-
-
    }
-   xprintf("BSP_AUDIO_OUT_HalfTransfer_CallBack\n");
-
-  // BSP_AUDIO_OUT_ChangeBuffer((uint16_t *)&out_buffer[0]+ OUT_BUFFER_SIZE/ 2, OUT_BUFFER_SIZE / 2);
-
 
 }
 
@@ -599,8 +593,6 @@ void BSP_AUDIO_OUT_TransferComplete_CallBack(void)
       BSP_AUDIO_OUT_Stop(CODEC_PDWN_SW);
       xprintf("BSP_AUDIO_OUT_TransferComplete_CallBack finished\n");
    }
-      xprintf("BSP_AUDIO_OUT_TransferComplete_CallBack\n");
-
         BSP_AUDIO_OUT_ChangeBuffer((uint16_t *)&out_buffer[0], OUT_BUFFER_SIZE / 2);
 
 
@@ -678,7 +670,6 @@ void StartDefaultTask(void const *argument)
   if(mp3_proccess(&file)==0){
     BSP_AUDIO_OUT_Play((uint16_t*)&out_buffer[0],OUT_BUFFER_SIZE*2);
     while(1){
-        xprintf(".");
        // vTaskDelay(200);
     }
     BSP_AUDIO_OUT_Stop(CODEC_PDWN_SW);
@@ -761,7 +752,6 @@ void _Error_Handler(char *file, int line)
 
 int mp3_proccess(FIL *mp3_file){
   	MP3FrameInfo mp3FrameInfo;
-  xprintf("find sync word\n");
 	if (read_pointer == NULL) {
 		if(refill_inbuffer(mp3_file) != 0){
 			return END_OF_FILE;
@@ -781,16 +771,11 @@ int mp3_proccess(FIL *mp3_file){
 	}
 	read_pointer += offset;
 	bytes_left -= offset;
-  xprintf("MP3GetNextFrameInfo\n");
 
 	if (MP3GetNextFrameInfo(hMP3Decoder, &mp3FrameInfo, read_pointer) == 0 &&
 			mp3FrameInfo.nChans == 2 &&
 			mp3FrameInfo.version == 0) {
-		//debug_printf("Found a frame at offset %x\n", offset + read_ptr - mp3buf + mp3file->fptr);
 	} else {
-    //nigdy tu nie wpada
-		// advance data pointer
-		// TODO: handle bytes_left == 0
 		if(bytes_left > 0){
 			bytes_left -= 1;
 			read_pointer += 1;
@@ -805,21 +790,16 @@ int mp3_proccess(FIL *mp3_file){
 			return END_OF_FILE;
 	}
 
-  xprintf("MP3Decode\n");
 
 	if(buf_offs == (BUFFER_OFFSET_HALF)){
-    xprintf("%d---\n",bytes_left);
 		result = MP3Decode(hMP3Decoder, &read_pointer, &bytes_left, out_buffer, 0);
 		buf_offs = BUFFER_OFFSET_NONE;
 	}
 	if(buf_offs == (BUFFER_OFFSET_FULL)){
-        xprintf("%d+++\n",bytes_left);
-
 		result = MP3Decode(hMP3Decoder, &read_pointer, &bytes_left, &out_buffer[DECODED_MP3_FRAME_SIZE], 0);
 		buf_offs = BUFFER_OFFSET_NONE;
 	}
 
-	//DAC_DMA_enable();
 	if(result != ERR_MP3_NONE){
 		switch(result){
 		case ERR_MP3_INDATA_UNDERFLOW:
@@ -848,20 +828,12 @@ int refill_inbuffer(FIL *in_file)
 	if (bytes_left > 0) {
 
 		//copy remaining data to beginning of buffer
-    //    copy to  / copy from   /count
-    //xprintf("%d,",bytes_left);
 		memcpy(read_buffer, read_pointer, bytes_left);
 	}
 
 	bytes_to_read = READ_BUFFER_SIZE - bytes_left;
-     // xprintf("%d,",bytes_to_read );
 
-// * [IN] File object */
-//   void* buff,  /* [OUT] Buffer to store read data */
-//   UINT btr,    /* [IN] Number of bytes to read */
-//   UINT* br     /* [OUT] Number of bytes read */
 	result = f_read(in_file, (BYTE *)read_buffer + bytes_left, bytes_to_read, &bytes_read);
-       //xprintf(":%d,\n",bytes_read );
 
 	if(result != FR_OK)
 		return READ_ERROR;
