@@ -48,6 +48,7 @@
   ******************************************************************************
   */
 /* Includes ------------------------------------------------------------------*/
+
 #define READ_BUFFER_SIZE	2 * MAINBUF_SIZE  //4096
 #define DECODED_MP3_FRAME_SIZE	MAX_NGRAN * MAX_NCHAN * MAX_NSAMP
 //#define OUT_BUFFER_SIZE			2 * DECODED_MP3_FRAME_SIZE//
@@ -61,13 +62,21 @@
 #include "fatfs.h"
 #include "usb_host.h"
 #include "mp3dec.h"
-
+#include "stm32f4_discovery.h" //diody do debugowania
 /* USER CODE BEGIN Includes */
 
 #include "stm32f4_discovery_audio.h"
 #include "ansi.h"
 #include "term_io.h"
 #include "dbgu.h"
+
+#define BLUE LED6 
+#define RED LED5 
+#define ORANGE LED3 
+#define GREEN LED4
+#define ON BSP_LED_On
+#define OFF BSP_LED_Off
+
 
 enum
 {
@@ -129,6 +138,11 @@ void StartDefaultTask(void const *argument);
 /* USER CODE BEGIN 0 */
 
 /* USER CODE END 0 */
+
+
+
+
+
 
 /**
   * @brief  The application entry point.
@@ -609,6 +623,12 @@ void BSP_AUDIO_OUT_TransferComplete_CallBack(void)
 /* USER CODE END Header_StartDefaultTask */
 void StartDefaultTask(void const *argument)
 {
+  
+  BSP_LED_Init(GREEN);
+  BSP_LED_Init(BLUE);
+  BSP_LED_Init(ORANGE);
+  BSP_LED_Init(RED);
+
   /* init code for USB_HOST */
   MX_USB_HOST_Init();
 
@@ -641,9 +661,25 @@ void StartDefaultTask(void const *argument)
   {
     xprintf("wave file open ERROR, res = %d\n", res);
     f_disp_res(res);
-    while (1)
-      ;
+    while (1);
   }
+
+
+
+
+
+  ON(GREEN);
+  ON(BLUE);
+  ON(ORANGE);
+  ON(RED);
+
+  vTaskDelay(5000);
+
+  OFF(GREEN);
+  OFF(BLUE);
+  OFF(ORANGE);
+  OFF(RED);
+
 
   if(BSP_AUDIO_OUT_Init(OUTPUT_DEVICE_AUTO, 70, AUDIO_FREQUENCY_32K) == 0)
 	{
