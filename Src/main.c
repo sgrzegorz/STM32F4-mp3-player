@@ -588,6 +588,8 @@ static void f_disp_res(FRESULT r)
   */
 void BSP_AUDIO_OUT_HalfTransfer_CallBack(void)
 {
+  OFF(ORANGE);
+  ON(RED);
   buf_offs = BUFFER_OFFSET_HALF;
   //  if(mp3_proccess(&file)!=0){
   //     BSP_AUDIO_OUT_Stop(CODEC_PDWN_SW);
@@ -602,6 +604,9 @@ void BSP_AUDIO_OUT_HalfTransfer_CallBack(void)
 */
 void BSP_AUDIO_OUT_TransferComplete_CallBack(void)
 {
+  OFF(RED);
+  ON(ORANGE);
+
   buf_offs = BUFFER_OFFSET_FULL;
   //    if(mp3_proccess(&file)!=0){
   //     BSP_AUDIO_OUT_Stop(CODEC_PDWN_SW);
@@ -663,23 +668,6 @@ void StartDefaultTask(void const *argument)
     f_disp_res(res);
     while (1);
   }
-
-
-
-
-
-  ON(GREEN);
-  ON(BLUE);
-  ON(ORANGE);
-  ON(RED);
-
-  vTaskDelay(5000);
-
-  OFF(GREEN);
-  OFF(BLUE);
-  OFF(ORANGE);
-  OFF(RED);
-
 
   if(BSP_AUDIO_OUT_Init(OUTPUT_DEVICE_AUTO, 70, AUDIO_FREQUENCY_32K) == 0)
 	{
@@ -817,7 +805,8 @@ int mp3_proccess(FIL *mp3_file){
 			return END_OF_FILE;
 	}
 
-
+  OFF(GREEN);
+  ON(BLUE);
 	if(buf_offs == (BUFFER_OFFSET_HALF)){
 		result = MP3Decode(hMP3Decoder, &read_pointer, &bytes_left, out_buffer, 0);
 		buf_offs = BUFFER_OFFSET_NONE;
@@ -826,6 +815,8 @@ int mp3_proccess(FIL *mp3_file){
 		result = MP3Decode(hMP3Decoder, &read_pointer, &bytes_left, &out_buffer[DECODED_MP3_FRAME_SIZE], 0);
     buf_offs = BUFFER_OFFSET_NONE;
 	}
+  OFF(BLUE);
+  ON(GREEN);
 
 	if(result != ERR_MP3_NONE){
 		switch(result){
