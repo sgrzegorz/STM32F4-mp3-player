@@ -77,6 +77,12 @@
 #define ON BSP_LED_On
 #define OFF BSP_LED_Off
 
+enum
+{
+  PLAY_STATE = 0,
+  PAUSE_STATE,
+  STOP_STATE,
+};
 
 enum
 {
@@ -85,6 +91,8 @@ enum
   BUFFER_OFFSET_FULL,
 };
 
+static uint8_t actual_state = PLAY_STATE;
+static uint8_t previous_state = PLAY_STATE;
 static HMP3Decoder hMP3Decoder;
 static uint8_t *read_pointer;
 static uint8_t read_buffer[READ_BUFFER_SIZE];
@@ -126,6 +134,7 @@ static void MX_SPI1_Init(void);
 static void MX_RNG_Init(void);
 static void MX_TIM6_Init(void);
 static void MX_USART2_UART_Init(void);
+void change_state(char key);
 int refill_inbuffer(FIL *in_file);
 int mp3_proccess(FIL *mp3_file);
 void StartDefaultTask(void const *argument);
@@ -674,10 +683,24 @@ void StartDefaultTask(void const *argument)
   if(mp3_proccess(&file)==0){
     BSP_AUDIO_OUT_Play((uint16_t*)&out_buffer[0],OUT_BUFFER_SIZE*2);
     while(1){
+      char key = debug_inkey();
+      change_state(key);
+      if (actual_state == PLAY_STATE && previous_state == PLAY_STATE){
+        if(buf_offs==BUFFER_OFFSET_HALF || buf_offs==BUFFER_OFFSET_FULL){
+        mp3_proccess(&file);
+        }
+      vTaskDelay(1);
+      }
+      if(actual_state == PLAY_STATE && previous_state == PAUSE_STATE){
+      BSP_AUDIO_IN_Resume();
       if(buf_offs==BUFFER_OFFSET_HALF || buf_offs==BUFFER_OFFSET_FULL){
         mp3_proccess(&file);
-      }
+        }
       vTaskDelay(1);
+      }
+      if(actual_state == PAUSE_STATE && previous_state == PLAY_STATE){
+        BSP_AUDIO_OUT_Pause();
+      }
     }
     BSP_AUDIO_OUT_Stop(CODEC_PDWN_SW);
 		buf_offs = BUFFER_OFFSET_NONE;
@@ -825,6 +848,22 @@ int mp3_proccess(FIL *mp3_file){
 
 }
 
+void change_state(char key){
+  
+  switch(key){
+    case 'p':
+      previous_state = actual_state;
+      actual_state = PLAY_STATE;
+      break;
+    case 't':
+      previous_state = actual_state;
+      actual_state = PAUSE_STATE;
+      break;
+    default:
+      xprintf("Unknown key\n");
+      break;
+  }
+}
 
 int refill_inbuffer(FIL *in_file)
 {
