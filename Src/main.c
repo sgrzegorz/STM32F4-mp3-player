@@ -697,7 +697,7 @@ void play_mp3(char *songname)
   FRESULT res;
 
   res = f_open(&file, songname, FA_READ);
-  // res = f_open(&file, "0:/sound1.mp3", FA_READ);
+  //res = f_open(&file, "0:/sound1.mp3", FA_READ);
 
   if (res == FR_OK)
   {
@@ -707,8 +707,7 @@ void play_mp3(char *songname)
   {
     xprintf("mp3 file open ERROR, res = %d\n", res);
     f_disp_res(res);
-    while (1)
-      ;
+    while (1);
   }
 
   if (BSP_AUDIO_OUT_Init(OUTPUT_DEVICE_AUTO, 70, AUDIO_FREQUENCY_44K) == 0)
@@ -795,7 +794,7 @@ void handle_key_press_extraputty()
   case 'p':
     if (current_state == PLAY_STATE)
     {
-      previous_state = current_state;
+      // previous_state = current_state;
       current_state = PAUSE_STATE;
 
       if (BSP_AUDIO_OUT_Pause() != AUDIO_OK)
@@ -811,7 +810,7 @@ void handle_key_press_extraputty()
   case 'r':
     if (current_state == PAUSE_STATE)
     {
-      previous_state = current_state;
+      // previous_state = current_state;
       current_state = PLAY_STATE;
 
       if (BSP_AUDIO_OUT_Resume() != AUDIO_OK)
