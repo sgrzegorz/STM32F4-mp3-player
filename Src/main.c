@@ -670,7 +670,7 @@ void StartDefaultTask(void const *argument)
 
   // char string[256] ="0:/sound.mp3";
 
-  int song_id = 5;
+  int song_id = 5; //bo akurat piosenka z tym id jest najkrotsza i od niej chcialbym zaczac. Potem usune te linijke
   while (1)
   {
     if(current_state == STOP_STATE){
