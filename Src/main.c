@@ -99,7 +99,6 @@ enum
   SONG_ISNT_PLAYED_NOW,
 };
 
-static uint8_t previous_state = PLAY_STATE;
 static uint8_t current_state = PLAY_STATE;
 static uint8_t playing = SONG_IS_PLAYED_NOW;
 
@@ -110,9 +109,9 @@ static int offset;
 static int result;
 static uint8_t buf_offs = BUFFER_OFFSET_NONE;
 short out_buffer[OUT_BUFFER_SIZE];
-static int underflows = 0;
+// static int underflows = 0;
 static int bytes_left = 0;
-static int bytes_left_before_decoding = 0;
+// static int bytes_left_before_decoding = 0;
 /* USER CODE END Includes */
 
 /* Private variables ---------------------------------------------------------*/
@@ -523,8 +522,8 @@ extern USBH_HandleTypeDef hUsbHostHS;
 
 #define AUDIO_BUFFER_SIZE 4096
 uint8_t buff[AUDIO_BUFFER_SIZE];
-static uint8_t player_state = 0;
-static uint32_t fpos = 0;
+// static uint8_t player_state = 0;
+// static uint32_t fpos = 0;
 
 static void f_disp_res(FRESULT r)
 {
