@@ -153,6 +153,7 @@ int refill_inbuffer(FIL *in_file);
 int mp3_proccess(FIL *mp3_file);
 void StartDefaultTask(void const *argument);
 void play_mp3(char *songname);
+void search_for_songs(char *path);
 /* USER CODE BEGIN PFP */
 /* Private function prototypes -----------------------------------------------*/
 
@@ -659,72 +660,16 @@ void StartDefaultTask(void const *argument)
     vTaskDelay(250);
   } while (Appli_state != APPLICATION_READY);
 
-    char* path = "0:/";
-    DIR directory;
-    FILINFO info;
-
-    if (f_opendir(&directory, path) != FR_OK) {
-        xprintf("Error opening the directory\n");
-        return;
-    }
-
-    while(1) {
-      xprintf("%d mp3count\n",mp3FilesCounter);
-        if (f_readdir(&directory, &info) != FR_OK) {
-            xprintf("Error reading from directory\n");
-            return;
-        }
-        if (info.fname[0] == 0){
-          break;
-        }
-        xprintf("%s,\n",info.fname);
-        if (strstr(info.fname, ".mp3") || strstr(info.fname, ".MP3")){
-          mp3FilesCounter++;
-        } 
-        
-    }
-
-    f_closedir(&directory);
-
-    int i = 0;
-    paths = malloc(sizeof(char*) * mp3FilesCounter);
-
-    if (paths == NULL) {
-        xprintf("Error allocating memory\n");
-        return;
-    }
-
-    if (f_opendir(&directory, path) != FR_OK) {
-        xprintf("Error opening the directory\n");
-        return;
-    }
-
-    while(1) {
-        if (f_readdir(&directory, &info) != FR_OK) {
-            xprintf("Error reading from directory\n");
-            return;
-        }
-        if (info.fname[0] == 0)
-            break;
-        if (strstr(info.fname, ".mp3") || strstr(info.fname, ".MP3")) {
-            paths[i] = malloc((strlen(info.fname) + 1) * sizeof(char));
-			strcpy(paths[i], info.fname);
-			xprintf("%s\n", paths[i]);
-            i++;
-        }
-    }
-
-	f_closedir(&directory);
-
-
-
-  xprintf("%d  mp3FilesCounter\n",mp3FilesCounter);
-  for(int i=0;i<mp3FilesCounter;i++){
-    xprintf("%s\n",paths[i]);
-  }
+  char* path = "0:/";
+  search_for_songs(path);
 
   // char string[256] ="0:/sound.mp3";
-  play_mp3(paths[3]);
+  while(1){
+
+    play_mp3(paths[6]);
+
+
+  }
   /* Infinite loop */
 
   // for (;;)
@@ -758,9 +703,72 @@ void StartDefaultTask(void const *argument)
   // }
 }
 
+
+void search_for_songs(char *path){
+    
+    DIR directory;
+    FILINFO info;
+
+    if (f_opendir(&directory, path) != FR_OK) {
+        xprintf("Error opening the directory\n");
+        return;
+    }
+
+    while(1) {
+        if (f_readdir(&directory, &info) != FR_OK) {
+            xprintf("Error reading from directory\n");
+            return;
+        }
+        if (info.fname[0] == 0){
+          break;
+        }
+        if (strstr(info.fname, ".mp3") || strstr(info.fname, ".MP3")){
+          mp3FilesCounter++;
+        } 
+        
+    }
+
+    f_closedir(&directory);
+
+    int i = 0;
+    paths = malloc(sizeof(char*) * mp3FilesCounter);
+
+    if (paths == NULL) {
+        xprintf("Error allocating memory\n");
+        return;
+    }
+
+    if (f_opendir(&directory, path) != FR_OK) {
+        xprintf("Error opening the directory\n");
+        return;
+    }
+
+    while(1) {
+        if (f_readdir(&directory, &info) != FR_OK) {
+            xprintf("Error reading from directory\n");
+            return;
+        }
+        if (info.fname[0] == 0)
+            break;
+        if (strstr(info.fname, ".mp3") || strstr(info.fname, ".MP3")) {
+            paths[i] = malloc((strlen(info.fname) + 1) * sizeof(char));
+			      strcpy(paths[i], info.fname);
+            i++;
+        }
+    }
+
+	f_closedir(&directory);
+
+
+
+  xprintf("\n\nNumber of songs: %d \n",mp3FilesCounter);
+  for(int i=0;i<mp3FilesCounter;i++){
+    xprintf("paths[%d] %s\n",i,paths[i]);
+  }
+}
+
 void play_mp3(char *songname)
 {
-  ON(GREEN);
   FRESULT res;
 
   res = f_open(&file, songname, FA_READ);
@@ -789,6 +797,9 @@ void play_mp3(char *songname)
   hMP3Decoder = MP3InitDecoder();
   read_pointer = NULL;
 
+  current_state = PLAY_STATE;
+  playing = SONG_IS_PLAYED_NOW;
+
   if (mp3_proccess(&file) == 0)
   {
     BSP_AUDIO_OUT_Play((uint16_t *)&out_buffer[0], OUT_BUFFER_SIZE * 2);
@@ -798,11 +809,18 @@ void play_mp3(char *songname)
       if (playing == SONG_IS_PLAYED_NOW)
       {
 
-        OFF(GREEN);
         if (buf_offs == BUFFER_OFFSET_HALF || buf_offs == BUFFER_OFFSET_FULL)
         {
-          ON(GREEN);
-          mp3_proccess(&file);
+          if(mp3_proccess(&file) == END_OF_FILE){
+            playing = SONG_ISNT_PLAYED_NOW;
+            ON(ORANGE);
+            if(BSP_AUDIO_OUT_Stop(CODEC_PDWN_SW) !=AUDIO_OK){
+                xprintf("BSP_AUDIO_OUT_STOP failed\n");
+            }
+
+            current_state = STOP_STATE;
+            break;
+          }
         }
         vTaskDelay(1);
       }
@@ -861,7 +879,6 @@ void handle_key_press_extraputty()
   case 'p':
     if (current_state == PLAY_STATE)
     {
-      // previous_state = current_state;
       current_state = PAUSE_STATE;
 
       if (BSP_AUDIO_OUT_Pause() != AUDIO_OK)
@@ -877,7 +894,6 @@ void handle_key_press_extraputty()
   case 'r':
     if (current_state == PAUSE_STATE)
     {
-      // previous_state = current_state;
       current_state = PLAY_STATE;
 
       if (BSP_AUDIO_OUT_Resume() != AUDIO_OK)
@@ -889,9 +905,24 @@ void handle_key_press_extraputty()
     break;
   case 's':
     current_state = STOP_STATE;
-    xprintf("stopped\n");
+    playing = SONG_ISNT_PLAYED_NOW;
+    if(BSP_AUDIO_OUT_Stop(CODEC_PDWN_SW) !=AUDIO_OK){
+      xprintf("BSP_AUDIO_OUT_STOP failed\n");
 
+    }
+    xprintf("stopped\n");
+    break;
+  case 'q':
+    //previous
+
+
+    break;
+  case 'w':
+    //next
+
+    break;
   default:
+    if(key!=0) xprintf("%d\n",key);
     break;
   }
 }
@@ -903,6 +934,8 @@ int mp3_proccess(FIL *mp3_file)
   {
     if (refill_inbuffer(mp3_file) != 0)
     {
+      xprintf("Returning end of file0\n");
+
       return END_OF_FILE;
     }
   }
@@ -911,8 +944,11 @@ int mp3_proccess(FIL *mp3_file)
   while (offset < 0)
   {
 
-    if (refill_inbuffer(mp3_file) != 0)
+    if (refill_inbuffer(mp3_file) != 0){
+      xprintf("Returning end of file1\n");
       return END_OF_FILE;
+
+    }
     if (bytes_left > 0)
     {
       bytes_left -= 1;
@@ -940,8 +976,11 @@ int mp3_proccess(FIL *mp3_file)
 
   if (bytes_left < MAINBUF_SIZE)
   {
-    if (refill_inbuffer(mp3_file) != 0)
+    if (refill_inbuffer(mp3_file) != 0){
+      xprintf("Returning end of file2\n");
       return END_OF_FILE;
+    }
+
   }
 
   ON(BLUE);
@@ -963,8 +1002,12 @@ int mp3_proccess(FIL *mp3_file)
     {
     case ERR_MP3_INDATA_UNDERFLOW:
       bytes_left = 0;
-      if (refill_inbuffer(mp3_file) != 0)
+      if (refill_inbuffer(mp3_file) != 0){
+        xprintf("Returning end of file3\n");
+
+
         return END_OF_FILE;
+      } 
       break;
     case ERR_MP3_MAINDATA_UNDERFLOW:
       //do nothing, next call to MP3Decode will provide more data
