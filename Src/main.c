@@ -144,11 +144,11 @@ static void MX_SPI1_Init(void);
 static void MX_RNG_Init(void);
 static void MX_TIM6_Init(void);
 static void MX_USART2_UART_Init(void);
-void change_state(char key);
+void handle_key_press_extraputty(void);
 int refill_inbuffer(FIL *in_file);
 int mp3_proccess(FIL *mp3_file);
 void StartDefaultTask(void const *argument);
-
+void play_mp3(char *songname);
 /* USER CODE BEGIN PFP */
 /* Private function prototypes -----------------------------------------------*/
 
@@ -654,84 +654,10 @@ void StartDefaultTask(void const *argument)
     xprintf(".");
     vTaskDelay(250);
   } while (Appli_state != APPLICATION_READY);
+    ON(ORANGE);
 
-  FRESULT res;
-
-  res = f_open(&file, "0:/sound.mp3", FA_READ);
-  // res = f_open(&file, "0:/sound1.mp3", FA_READ);
-
-  if (res == FR_OK)
-  {
-    xprintf("wave file open OK\n");
-  }
-  else
-  {
-    xprintf("wave file open ERROR, res = %d\n", res);
-    f_disp_res(res);
-    while (1)
-      ;
-  }
-
-  if (BSP_AUDIO_OUT_Init(OUTPUT_DEVICE_AUTO, 70, AUDIO_FREQUENCY_44K) == 0)
-  {
-    xprintf("Audio Init Ok\n");
-  }
-  else
-  {
-    xprintf("Audio Init Error\n");
-  }
-
-  hMP3Decoder = MP3InitDecoder();
-  read_pointer = NULL;
-
-  if (mp3_proccess(&file) == 0)
-  {
-    BSP_AUDIO_OUT_Play((uint16_t *)&out_buffer[0], OUT_BUFFER_SIZE * 2);
-
-    while (1)
-    {
-      if (playing ==SONG_IS_PLAYED_NOW)
-      {
-        
-        OFF(GREEN);
-        if (buf_offs == BUFFER_OFFSET_HALF || buf_offs == BUFFER_OFFSET_FULL)
-        {
-          //xprintf(".\n");
-          ON(GREEN);
-          mp3_proccess(&file);
-        }
-        vTaskDelay(1);
-      }
-
-      handle_key_press_extraputty();
-      
-      // if (previous_state == PAUSE_STATE && current_state == PLAY_STATE)
-      // {
-      
-
-
-
-
-
-      //   if (buf_offs == BUFFER_OFFSET_HALF || buf_offs == BUFFER_OFFSET_FULL)
-      //   {
-      //     mp3_proccess(&file);
-      //   }
-      //   // vTaskDelay(1);
-      // }
-      // else if (previous_state == PLAY_STATE && current_state == PAUSE_STATE)
-      // {
-
-
-      // }
-      // else
-      // {
-      // }
-    }
-    BSP_AUDIO_OUT_Stop(CODEC_PDWN_SW);
-    buf_offs = BUFFER_OFFSET_NONE;
-  }
-
+  char string[256] ="0:/sound.mp3";
+  play_mp3(string);
   /* Infinite loop */
 
   // for (;;)
@@ -763,6 +689,64 @@ void StartDefaultTask(void const *argument)
 
   // /* USER CODE END 5 */
   // }
+}
+
+void play_mp3(char *songname)
+{
+  ON(GREEN);
+  FRESULT res;
+
+  res = f_open(&file, songname, FA_READ);
+  // res = f_open(&file, "0:/sound1.mp3", FA_READ);
+
+  if (res == FR_OK)
+  {
+    xprintf("mp3 file open OK\n");
+  }
+  else
+  {
+    xprintf("mp3 file open ERROR, res = %d\n", res);
+    f_disp_res(res);
+    while (1)
+      ;
+  }
+
+  if (BSP_AUDIO_OUT_Init(OUTPUT_DEVICE_AUTO, 70, AUDIO_FREQUENCY_44K) == 0)
+  {
+    xprintf("Audio Init Ok\n");
+  }
+  else
+  {
+    xprintf("Audio Init Error\n");
+  }
+
+  hMP3Decoder = MP3InitDecoder();
+  read_pointer = NULL;
+
+  if (mp3_proccess(&file) == 0)
+  {
+    BSP_AUDIO_OUT_Play((uint16_t *)&out_buffer[0], OUT_BUFFER_SIZE * 2);
+
+    while (1)
+    {
+      if (playing == SONG_IS_PLAYED_NOW)
+      {
+
+        OFF(GREEN);
+        if (buf_offs == BUFFER_OFFSET_HALF || buf_offs == BUFFER_OFFSET_FULL)
+        {
+          ON(GREEN);
+          mp3_proccess(&file);
+        }
+        vTaskDelay(1);
+      }
+
+      handle_key_press_extraputty();
+
+      if (current_state == STOP_STATE)
+        break;
+    }
+  }
 }
 
 /**
@@ -806,7 +790,6 @@ void handle_key_press_extraputty()
 {
   char key = debug_inkey();
 
-
   switch (key)
   {
   case 'p':
@@ -815,10 +798,10 @@ void handle_key_press_extraputty()
       previous_state = current_state;
       current_state = PAUSE_STATE;
 
-        if (BSP_AUDIO_OUT_Pause() != AUDIO_OK)
-          xprintf("Pause failed\n");
+      if (BSP_AUDIO_OUT_Pause() != AUDIO_OK)
+        xprintf("Pause failed\n");
 
-      playing =SONG_ISNT_PLAYED_NOW;
+      playing = SONG_ISNT_PLAYED_NOW;
       xprintf("paused\n");
     }
     else if (current_state == PAUSE_STATE)
@@ -831,20 +814,20 @@ void handle_key_press_extraputty()
       previous_state = current_state;
       current_state = PLAY_STATE;
 
-        if (BSP_AUDIO_OUT_Resume() != AUDIO_OK)
-          xprintf("BSP_AUDIO_IN_Resume failed\n");
+      if (BSP_AUDIO_OUT_Resume() != AUDIO_OK)
+        xprintf("BSP_AUDIO_IN_Resume failed\n");
 
-      playing =SONG_IS_PLAYED_NOW;
+      playing = SONG_IS_PLAYED_NOW;
       xprintf("resumed\n");
-
     }
     break;
-    
+  case 's':
+    current_state = STOP_STATE;
+    xprintf("stopped\n");
+
   default:
     break;
   }
-
-
 }
 
 int mp3_proccess(FIL *mp3_file)
