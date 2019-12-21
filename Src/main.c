@@ -111,6 +111,11 @@ static uint8_t buf_offs = BUFFER_OFFSET_NONE;
 short out_buffer[OUT_BUFFER_SIZE];
 // static int underflows = 0;
 static int bytes_left = 0;
+
+
+char** paths;
+int mp3FilesCounter = 0;
+int currentFilePosition = -1;
 // static int bytes_left_before_decoding = 0;
 /* USER CODE END Includes */
 
@@ -653,10 +658,73 @@ void StartDefaultTask(void const *argument)
     xprintf(".");
     vTaskDelay(250);
   } while (Appli_state != APPLICATION_READY);
-    ON(ORANGE);
 
-  char string[256] ="0:/sound.mp3";
-  play_mp3(string);
+    char* path = "0:/";
+    DIR directory;
+    FILINFO info;
+
+    if (f_opendir(&directory, path) != FR_OK) {
+        xprintf("Error opening the directory\n");
+        return;
+    }
+
+    while(1) {
+      xprintf("%d mp3count\n",mp3FilesCounter);
+        if (f_readdir(&directory, &info) != FR_OK) {
+            xprintf("Error reading from directory\n");
+            return;
+        }
+        if (info.fname[0] == 0){
+          break;
+        }
+        xprintf("%s,\n",info.fname);
+        if (strstr(info.fname, ".mp3") || strstr(info.fname, ".MP3")){
+          mp3FilesCounter++;
+        } 
+        
+    }
+
+    f_closedir(&directory);
+
+    int i = 0;
+    paths = malloc(sizeof(char*) * mp3FilesCounter);
+
+    if (paths == NULL) {
+        xprintf("Error allocating memory\n");
+        return;
+    }
+
+    if (f_opendir(&directory, path) != FR_OK) {
+        xprintf("Error opening the directory\n");
+        return;
+    }
+
+    while(1) {
+        if (f_readdir(&directory, &info) != FR_OK) {
+            xprintf("Error reading from directory\n");
+            return;
+        }
+        if (info.fname[0] == 0)
+            break;
+        if (strstr(info.fname, ".mp3") || strstr(info.fname, ".MP3")) {
+            paths[i] = malloc((strlen(info.fname) + 1) * sizeof(char));
+			strcpy(paths[i], info.fname);
+			xprintf("%s\n", paths[i]);
+            i++;
+        }
+    }
+
+	f_closedir(&directory);
+
+
+
+  xprintf("%d  mp3FilesCounter\n",mp3FilesCounter);
+  for(int i=0;i<mp3FilesCounter;i++){
+    xprintf("%s\n",paths[i]);
+  }
+
+  // char string[256] ="0:/sound.mp3";
+  play_mp3(paths[3]);
   /* Infinite loop */
 
   // for (;;)
