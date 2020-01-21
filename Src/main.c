@@ -838,8 +838,14 @@ void play_mp3(char *songname)
         {
           if (mp3_proccess(&file) == END_OF_FILE)
           {
+            ON(GREEN);
             playing = SONG_ISNT_PLAYED_NOW;
             current_state = NEXT_STATE;
+
+                if (BSP_AUDIO_OUT_Stop(CODEC_PDWN_HW) != AUDIO_OK)
+                {
+                  xprintf("BSP_AUDIO_OUT_STOP failed\n");
+                }
           }
         }
         vTaskDelay(1);
@@ -853,7 +859,7 @@ void play_mp3(char *songname)
       }
     }
 
-    if (BSP_AUDIO_OUT_Stop(CODEC_PDWN_SW) != AUDIO_OK)
+    if (BSP_AUDIO_OUT_Stop(CODEC_PDWN_HW) != AUDIO_OK)
     {
       xprintf("BSP_AUDIO_OUT_STOP failed\n");
     }
